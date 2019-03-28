@@ -1,0 +1,22 @@
+include: 'https://dev.zxteam.net/maxim.anurin/gitlab-pipelines/raw/master/node/internal-lib.yml'
+
+image: registry.dev.zxteam.net/pub/docker/build/node10.protoc-mysqlcli-psqlcli:1
+
+cache:
+  paths:
+    - node_modules/
+
+test:
+  stage: test
+  dependencies:
+    - build
+  variables:
+    GIT_STRATEGY: none
+    TEST_DB_URL: 'postgres://devtest@postgres:5432/emptytestdb'
+  services:
+    - name: registry.dev.zxteam.net/pub/docker/test/postgres10:1
+      alias: postgres
+  before_script:
+    - npm run prepare:initdb
+  script:
+    - npm run test

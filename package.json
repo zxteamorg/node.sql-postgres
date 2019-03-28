@@ -1,0 +1,57 @@
+{
+	"name": "@zxteam/sql.postgres",
+	"version": "0.0.1",
+	"description": "ZXTeam's SQL implementation for PostgreSQL",
+	"main": "./src/index.js",
+	"types": "./src/index.d.ts",
+	"author": {
+		"name": "Maxim Anurin",
+		"email": "maxim.anurin@zxteam.org",
+		"url": "http://www.anurin.name"
+	},
+	"contributors": [
+		{
+			"name": "Serhii Zghama",
+			"email": "serhii.zghama@zxteam.org"
+		}
+	],
+	"license": "MIT",
+	"devDependencies": {
+		"@types/chai-datetime": "0.0.31",
+		"@zxnode/build": "0.0.32",
+		"@zxteam/ensure.js": "^1.0.0",
+		"chai-datetime": "^1.5.0"
+	},
+	"dependencies": {
+		"@types/pg": "^7.4.14",
+		"@zxteam/contract": "^3.0.2",
+		"@zxteam/contract.sql": "^3.0.2",
+		"@zxteam/disposable": "^3.0.2",
+		"@zxteam/financial.js": "^3.0.3",
+		"pg": "^7.9.0",
+		"ptask.js": "^3.0.2"
+	},
+	"keywords": [
+		"zx",
+		"zxteam",
+		"library",
+		"reusable",
+		"sql",
+		"postgres"
+	],
+	"repository": {
+		"type": "git",
+		"url": "ssh://git@dev.zxteam.net:22282/pub/node/sql.postgres.git"
+	},
+	"bugs": {
+		"url": "https://dev.zxteam.net/pub/node/sql.postgres/issues"
+	},
+	"homepage": "https://dev.zxteam.net/pub/node/sql.postgres#readme",
+	"scripts": {
+		"build": "zxbuild clean dist",
+		"test:local": "env TEST_DB_URL=\"postgres://\" mocha --require source-map-support/register --recursive \"test/**/*.test.js\"",
+		"test": "mocha --require source-map-support/register --recursive \"test/**/*.test.js\"",
+		"prepare:initdb": "scripts/init-test-db.sh"
+	},
+	"private": true
+}
