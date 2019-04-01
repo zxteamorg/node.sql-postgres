@@ -24,7 +24,7 @@
 	},
 	"dependencies": {
 		"@types/pg": "^7.4.14",
-		"@zxteam/contract": "^3.0.2",
+		"@zxteam/contract": "^3.2.1",
 		"@zxteam/contract.sql": "^3.0.2",
 		"@zxteam/disposable": "^3.0.2",
 		"@zxteam/financial.js": "^3.0.3",

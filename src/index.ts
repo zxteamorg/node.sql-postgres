@@ -159,17 +159,18 @@ class PostgresStatement implements SqlStatement {
 				if (this._logger.isTraceEnabled) {
 					this._logger.trace("Executing:", this._sqlText, values);
 				}
-				const client = this._owner.postgresConnection;
-				client.query(this._sqlText, values)
-					.then(res => {
-						resolve();
-					}).catch(err => {
-						if (this._logger.isTraceEnabled) {
-							this._logger.trace("Executed with error:", err);
+				this._owner.postgresConnection.query(this._sqlText, values,
+					(err, results) => {
+						if (err) {
+							if (this._logger.isTraceEnabled) {
+								this._logger.trace("Executed with error:", err);
+							}
+							return reject(err);
 						}
-						return reject(err);
-					}).finally(() => {
-						client.release();
+						if (this._logger.isTraceEnabled) {
+							this._logger.trace("Executed");
+						}
+						resolve();
 					});
 			});
 		}, cancellationToken);
@@ -178,9 +179,35 @@ class PostgresStatement implements SqlStatement {
 	public executeQuery(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Task<Array<SqlResultRecord>> {
 		return Task.run((ct: CancellationToken) => {
 			return new Promise<Array<SqlResultRecord>>((resolve, reject) => {
-				throw Error("Not implemented yet");
+				if (this._logger.isTraceEnabled) {
+					this._logger.trace("Executing Query:", this._sqlText, values);
+				}
+				this._owner.postgresConnection.query(this._sqlText, values, (
+					(err: any, underlyingResult: pg.QueryResult) => {
+						if (err) {
+							if (this._logger.isTraceEnabled) {
+								this._logger.trace("Executed Query with error:", err);
+							}
+							return reject(err);
+						}
+						if (this._logger.isTraceEnabled) {
+							this._logger.trace("Executed Query:", underlyingResult);
+						}
+						const underlyingResultRows = underlyingResult.rows;
+						const underlyingResultFields = underlyingResult.fields;
+						if (underlyingResultRows.length > 0 && !(underlyingResultFields[0].dataTypeID === 2278)) {
+							return resolve(underlyingResultRows.map(row => new PostgresSqlResultRecord(row, underlyingResultFields)));
+						} else {
+							return resolve([]);
+						}
+					}));
 			});
 		}, cancellationToken);
+	}
+
+	// tslint:disable-next-line:max-line-length
+	public executeQueryMultiSets(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Task<Array<Array<SqlResultRecord>>> {
+		throw new Error("not impl yet");
 	}
 
 	public executeScalar(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Task<SqlData> {
@@ -201,19 +228,13 @@ class PostgresStatement implements SqlStatement {
 							this._logger.trace("Executed Scalar:", underlyingResult);
 						}
 						const underlyingRows = underlyingResult.rows;
+						const underlyingFields = underlyingResult.fields;
 						if (underlyingRows.length > 0) {
 							const underlyingFirstRow = underlyingRows[0];
 							const value = underlyingFirstRow[Object.keys(underlyingFirstRow)[0]];
-							const nameColumn = Object.keys(underlyingFirstRow)[0];
-							if (typeof value === "string" && value.startsWith("<unnamed portal")) {
-								console.log("unnamed");
-								this._owner.postgresConnection.query("FETCH ALL FROM \"<unnamed portal 1>\"", [],
-									(errs: any, underlying: pg.QueryResult) => {
-										console.log(underlying);
-									});
-							}
-							if (value !== undefined || nameColumn !== undefined) {
-								return resolve(new PostgresData(value, nameColumn));
+							const fi = underlyingFields[0];
+							if (value !== undefined || fi !== undefined) {
+								return resolve(new PostgresData(value, fi));
 							}
 						}
 						return reject(new Error("Underlying MySql provider returns not enough data to complete request."));
@@ -252,14 +273,28 @@ class PostgresSqlResultRecord implements SqlResultRecord {
 	}
 
 	private get nameMap(): PostgresSqlResultRecord.NameMap {
-		throw Error("Not implemented yet");
+		if (this._nameMap === undefined) {
+			const nameMap: PostgresSqlResultRecord.NameMap = {};
+			const total = this._fieldsInfo.length;
+			for (let index = 0; index < total; ++index) {
+				const fi: pg.FieldDef = this._fieldsInfo[index];
+				if (fi.name in nameMap) { throw new Error("Cannot access SqlResultRecord by name due result set has name duplicates"); }
+				nameMap[fi.name] = fi;
+			}
+			this._nameMap = nameMap;
+		}
+		return this._nameMap;
 	}
 
 	private getByIndex(index: number): SqlData {
-		throw Error("Not implemented yet");
+		const fi: pg.FieldDef = this._fieldsInfo[index];
+		const value: any = this._fieldsData[fi.name];
+		return new PostgresData(value, fi);
 	}
 	private getByName(name: string): SqlData {
-		throw Error("Not implemented yet");
+		const fi = this.nameMap[name];
+		const value: any = this._fieldsData[fi.name];
+		return new PostgresData(value, fi);
 	}
 }
 
@@ -293,7 +328,7 @@ class PostgresTempTable extends Initable implements SqlTemporaryTable {
 	}
 	protected async onDispose(): Promise<void> {
 		try {
-			await this._owner.statement(`DROP TEMPORARY TABLE ${this._tableName}`).execute(this._cancellationToken);
+			await this._owner.statement(`DROP TABLE ${this._tableName}`).execute(this._cancellationToken);
 		} catch (e) {
 			// dispose never raise error
 			if (e instanceof Error && e.name === "CancelledError") {
@@ -307,7 +342,7 @@ class PostgresTempTable extends Initable implements SqlTemporaryTable {
 
 class PostgresData implements SqlData {
 	private readonly _postgresValue: any;
-	private readonly _nameСolumn: string;
+	private readonly _fi: pg.FieldDef;
 
 	public get asBoolean(): boolean {
 		if (typeof this._postgresValue === "boolean") {
@@ -438,16 +473,16 @@ class PostgresData implements SqlData {
 		}
 	}
 
-	public constructor(postgresValue: any, nameColumn: string) {
+	public constructor(postgresValue: any, fi: pg.FieldDef) {
 		if (postgresValue === undefined) {
 			throw new ArgumentError("postgresValue is undefined");
 		}
 		this._postgresValue = postgresValue;
-		this._nameСolumn = nameColumn;
+		this._fi = fi;
 	}
 
 	private formatWrongDataTypeMessage(): string {
-		return `Invalid conversion: requested wrong data type of field '${this._nameСolumn}'`;
+		return `Invalid conversion: requested wrong data type of field '${this._fi.name}'`;
 	}
 }
 

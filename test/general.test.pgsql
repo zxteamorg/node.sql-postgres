@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS "tb_1";
+-- DROP TABLE IF EXISTS "tb_1";
 CREATE TABLE "tb_1" (
 	"varchar" VARCHAR(128) NOT NULL,
 	"int" INT NOT NULL,
@@ -10,8 +10,8 @@ INSERT INTO "tb_1" VALUES ('two', 2);
 INSERT INTO "tb_1" VALUES ('three', 3);
 
 
-DROP FUNCTION IF EXISTS sp_contains;
-CREATE FUNCTION sp_contains("varchar" VARCHAR(128))
+-- DROP FUNCTION IF EXISTS sp_contains;
+CREATE FUNCTION sp_contains("value" VARCHAR(128))
 	RETURNS bool
 	LANGUAGE 'plpgsql'
 AS $BODY$
@@ -19,13 +19,13 @@ BEGIN
 	RETURN(SELECT EXISTS(
 		SELECT 1
 		FROM "tb_1" AS t
-		WHERE t."varchar" = "varchar"
+		WHERE t."varchar" = "value"
 	) AS "is_exist");
 END;
 $BODY$;
 
 
-DROP FUNCTION IF EXISTS sp_empty_fetch;
+-- DROP FUNCTION IF EXISTS sp_empty_fetch;
 CREATE FUNCTION sp_empty_fetch()
 	RETURNS void
 	LANGUAGE 'plpgsql'
@@ -35,7 +35,7 @@ END;
 $BODY$;
 
 
-DROP FUNCTION IF EXISTS sp_single_fetch;
+-- DROP FUNCTION IF EXISTS sp_single_fetch;
 CREATE FUNCTION sp_single_fetch()
 	RETURNS TABLE (
 	"varchar" VARCHAR(128),
@@ -49,7 +49,7 @@ END;
 $BODY$;
 
 
-DROP FUNCTION IF EXISTS sp_multi_fetch;
+-- DROP FUNCTION IF EXISTS sp_multi_fetch;
 CREATE FUNCTION sp_multi_fetch()
 	RETURNS SETOF refcursor
 	LANGUAGE plpgsql
@@ -67,7 +67,7 @@ END;
 $BODY$;
 
 
-DROP FUNCTION IF EXISTS sp_multi_fetch_ints;
+-- DROP FUNCTION IF EXISTS sp_multi_fetch_ints;
 CREATE FUNCTION sp_multi_fetch_ints()
 	RETURNS SETOF refcursor
 	LANGUAGE plpgsql

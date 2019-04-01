@@ -41,7 +41,7 @@ const DUMMY_CANCELLATION_TOKEN: CancellationToken = {
 	throwIfCancellationRequested(): void { /* STUB */ }
 };
 
-function getMysqlUrl(): URL {
+function getPostgresUrl(): URL {
 	function parseDbServerUrl(url: string): URL {
 		try {
 			return new URL(url);
@@ -74,7 +74,7 @@ function getMysqlUrl(): URL {
 }
 
 
-describe("MySQL Tests", function () {
+describe("PostgreSQL Tests", function () {
 	let sqlProviderFactory: Factory<SqlProvider>;
 	let sqlProvider: SqlProvider | null;
 
@@ -98,7 +98,7 @@ describe("MySQL Tests", function () {
 		});
 		*/
 
-		sqlProviderFactory = new lib.PostgresProviderFactory({ url: getMysqlUrl() });
+		sqlProviderFactory = new lib.PostgresProviderFactory({ url: getPostgresUrl() });
 	});
 
 	beforeEach(async function () {
@@ -113,7 +113,7 @@ describe("MySQL Tests", function () {
 		}
 	});
 
-	it.only("Read TRUE from multi record set through executeScalar", async function () {
+	it.skip("Read TRUE from multi record set through executeScalar", async function () {
 		const result = await getSqlProvider()
 			.statement("SELECT * FROM sp_multi_fetch_ints()")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
@@ -125,21 +125,21 @@ describe("MySQL Tests", function () {
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asBoolean, true);
 	});
-	it("Read 1 as boolean through executeScalar", async function () {
+	it("Read True as boolean through executeScalar", async function () {
 		const result = await getSqlProvider()
-			.statement("SELECT 1 AS c0, 0 AS c1 UNION ALL SELECT 0, 0")
+			.statement("SELECT True AS c0, 0 AS c1 UNION ALL SELECT False, 0")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asBoolean, true);
 	});
-	it("Read 1 as boolean through executeScalar (Stored Procedure)", async function () {
+	it("Read True as boolean through executeScalar (Stored Procedure)", async function () {
 		const result = await getSqlProvider()
-			.statement("CALL sp_contains('one')")
+			.statement("SELECT * FROM sp_contains('one')")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asBoolean, true);
 	});
-	it("Read 0 as boolean through executeScalar (Stored Procedure)", async function () {
+	it("Read False as boolean through executeScalar (Stored Procedure)", async function () {
 		const result = await getSqlProvider()
-			.statement("CALL sp_contains('none')")
+			.statement("SELECT * FROM sp_contains('none')")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asBoolean, false);
 	});
@@ -149,15 +149,15 @@ describe("MySQL Tests", function () {
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asBoolean, false);
 	});
-	it("Read 0 as boolean through executeScalar", async function () {
+	it("Read False as boolean through executeScalar", async function () {
 		const result = await getSqlProvider()
-			.statement("SELECT 0 AS c0, 1 AS c1 UNION SELECT 1, 1")
+			.statement("SELECT False AS c0, 1 AS c1 UNION ALL SELECT True, 1")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asBoolean, false);
 	});
 	it("Read NULL as nullable boolean through executeScalar", async function () {
 		const result = await getSqlProvider()
-			.statement("SELECT NULL AS c0, 1 AS c1 UNION SELECT 1, 1")
+			.statement("SELECT NULL AS c0, 1 AS c1 UNION ALL SELECT 1, 1")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asNullableBoolean, null);
 	});
@@ -183,7 +183,7 @@ describe("MySQL Tests", function () {
 	});
 	it("Read NULL as nullable number through executeScalar", async function () {
 		const result = await getSqlProvider()
-			.statement("SELECT NULL AS c0, 12 AS c1 UNION SELECT 21, 22")
+			.statement("SELECT NULL AS c0, 12 AS c1 UNION ALL SELECT 21, 22")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asNullableNumber, null);
 	});
@@ -208,8 +208,7 @@ describe("MySQL Tests", function () {
 	it("Read 2018-05-01T12:01:03.345 as Date through executeScalar", async function () {
 		const result = await getSqlProvider()
 			.statement(
-				"SELECT CONVERT('2018-05-01 12:01:02.345', DATETIME(6)) AS c0, "
-				+ " UTC_TIMESTAMP() AS c1 UNION ALL SELECT UTC_TIMESTAMP(), UTC_TIMESTAMP()")
+				"SELECT TIMESTAMP '2018-05-01 12:01:02.345' AS c0, NOW() AS c1 UNION ALL SELECT NOW(), NOW()")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equalDate(result.asDate, new Date(2018, 4/*May month = 4*/, 1, 12, 1, 2, 345));
 	});
@@ -217,27 +216,27 @@ describe("MySQL Tests", function () {
 		const result = await getSqlProvider()
 			.statement(
 				"SELECT NULL AS c0, "
-				+ " UTC_TIMESTAMP() AS c1 UNION ALL SELECT UTC_TIMESTAMP(), UTC_TIMESTAMP()")
+				+ " NOW() AS c1 UNION ALL SELECT NOW(), NOW()")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asNullableDate, null);
 	});
 
-	it("Read 0x007FFF as Uint8Array through executeScalar", async function () {
+	it("Read 0007FFF as Uint8Array through executeScalar", async function () {
 		const result = await getSqlProvider()
-			.statement("SELECT 0x007FFF AS c0, 0x00 AS c1 UNION ALL SELECT 0x00, 0x00")
+			.statement("SELECT '\\0007FFF'::bytea AS c0, '\\000'::bytea AS c1 UNION ALL SELECT '\\000'::bytea, '\\000'::bytea")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
-		assert.equalBytes(result.asBinary, new Uint8Array([0, 127, 255]));
+		assert.equalBytes(result.asBinary, new Uint8Array([0, 55, 70, 70, 70]));
 	});
 	it("Read NULL as Uint8Array through executeScalar", async function () {
 		const result = await getSqlProvider()
-			.statement("SELECT NULL AS c0, 0x00 AS c1 UNION ALL SELECT 0x00, 0x00")
+			.statement("SELECT NULL AS c0, '\\000'::bytea AS c1 UNION ALL SELECT '\\000'::bytea, '\\000'::bytea")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asNullableBinary, null);
 	});
 
 	it("Read booleans through executeQuery", async function () {
 		const resultArray = await getSqlProvider()
-			.statement("SELECT 1 AS c0, 0 AS c1 UNION ALL SELECT 0, 0 UNION ALL SELECT 1, 0")
+			.statement("SELECT True AS c0, False AS c1 UNION ALL SELECT False, False UNION ALL SELECT True, False")
 			.executeQuery(DUMMY_CANCELLATION_TOKEN);
 		assert.instanceOf(resultArray, Array);
 		assert.equal(resultArray.length, 3);
@@ -264,7 +263,7 @@ describe("MySQL Tests", function () {
 	});
 	it("Read strings through executeQuery (Stored Proc)", async function () {
 		const resultArray = await getSqlProvider()
-			.statement("CALL `sp_single_fetch`")
+			.statement("SELECT * FROM sp_single_fetch()")
 			.executeQuery(DUMMY_CANCELLATION_TOKEN);
 
 		assert.instanceOf(resultArray, Array);
@@ -273,9 +272,9 @@ describe("MySQL Tests", function () {
 		assert.equal(resultArray[1].get("varchar").asString, "two");
 		assert.equal(resultArray[2].get("varchar").asString, "three");
 	});
-	it("Read (string and int)s through executeQuery (Multi record sets Stored Proc)", async function () {
+	it.skip("Read (string and int)s through executeQuery (Multi record sets Stored Proc)", async function () {
 		const resultArray = await getSqlProvider()
-			.statement("CALL `sp_multi_fetch`")
+			.statement("SELECT * FROM sp_multi_fetch()")
 			.executeQuery(DUMMY_CANCELLATION_TOKEN);
 
 		assert.instanceOf(resultArray, Array);
@@ -289,7 +288,7 @@ describe("MySQL Tests", function () {
 	});
 	it("Read empty result through executeQuery (SELECT)", async function () {
 		const resultArray = await getSqlProvider()
-			.statement("SELECT * FROM `tb_1` WHERE 1=2")
+			.statement("SELECT * FROM \"tb_1\" WHERE 1=2")
 			.executeQuery(DUMMY_CANCELLATION_TOKEN);
 
 		assert.instanceOf(resultArray, Array);
@@ -297,7 +296,7 @@ describe("MySQL Tests", function () {
 	});
 	it("Read empty result through executeQuery (Stored Proc)", async function () {
 		const resultArray = await getSqlProvider()
-			.statement("CALL `sp_empty_fetch`")
+			.statement("SELECT * FROM sp_empty_fetch()")
 			.executeQuery(DUMMY_CANCELLATION_TOKEN);
 
 		assert.instanceOf(resultArray, Array);
@@ -306,11 +305,11 @@ describe("MySQL Tests", function () {
 	it("Call non-existing stored procedure", async function () {
 		try {
 			const resultArray = await getSqlProvider()
-				.statement("CALL `sp_non_existent`")
+				.statement("SELECT * FROM sp_non_existent()")
 				.executeQuery(DUMMY_CANCELLATION_TOKEN);
 		} catch (err) {
 			assert.containsAllKeys(err, ["code"]);
-			assert.equal((<any>err).code, "ER_SP_DOES_NOT_EXIST");
+			assert.equal((<any>err).code, "42883");
 			return;
 		}
 		assert.fail("No exceptions", "Exception with code: ER_SP_DOES_NOT_EXIST");
@@ -320,13 +319,13 @@ describe("MySQL Tests", function () {
 		const tempTable = await getSqlProvider().createTempTable(
 			DUMMY_CANCELLATION_TOKEN,
 			"tb_1", // Should override(hide) existing table
-			"`id` SMALLINT NOT NULL AUTO_INCREMENT, `title` VARCHAR(32) NOT NULL, `value` SMALLINT NOT NULL, PRIMARY KEY (`id`)"
+			"id SERIAL, title VARCHAR(32) NOT NULL, value SMALLINT NOT NULL, PRIMARY KEY (id)"
 		);
 		try {
-			await getSqlProvider().statement("INSERT INTO tb_1(`title`, `value`) VALUES('test title 1', ?)").execute(DUMMY_CANCELLATION_TOKEN, 1);
-			await getSqlProvider().statement("INSERT INTO tb_1(`title`, `value`) VALUES('test title 2', ?)").execute(DUMMY_CANCELLATION_TOKEN, 2);
+			await getSqlProvider().statement("INSERT INTO tb_1(title, value) VALUES('test title 1', $1)").execute(DUMMY_CANCELLATION_TOKEN, 1);
+			await getSqlProvider().statement("INSERT INTO tb_1(title, value) VALUES('test title 2', $1)").execute(DUMMY_CANCELLATION_TOKEN, 2);
 
-			const resultArray = await getSqlProvider().statement("SELECT `title`, `value` FROM `tb_1`").executeQuery(DUMMY_CANCELLATION_TOKEN);
+			const resultArray = await getSqlProvider().statement("SELECT title, value FROM tb_1").executeQuery(DUMMY_CANCELLATION_TOKEN);
 
 			assert.instanceOf(resultArray, Array);
 			assert.equal(resultArray.length, 2);
@@ -339,7 +338,7 @@ describe("MySQL Tests", function () {
 		}
 
 		// tslint:disable-next-line:max-line-length
-		const resultArrayAfterDestoroyTempTable = await getSqlProvider().statement("SELECT * FROM `tb_1`").executeQuery(DUMMY_CANCELLATION_TOKEN);
+		const resultArrayAfterDestoroyTempTable = await getSqlProvider().statement("SELECT * FROM tb_1").executeQuery(DUMMY_CANCELLATION_TOKEN);
 
 		assert.instanceOf(resultArrayAfterDestoroyTempTable, Array);
 		assert.equal(resultArrayAfterDestoroyTempTable.length, 3);
