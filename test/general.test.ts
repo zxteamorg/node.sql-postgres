@@ -348,7 +348,7 @@ describe("PostgreSQL Tests", function () {
 		assert.equal(resultArrayAfterDestoroyTempTable[0].get("int").asNumber, 1);
 		assert.equal(resultArrayAfterDestoroyTempTable[0].get("varchar").asString, "one");
 	});
-	it.skip("Read two Result Sets via sp_multi_fetch", async function () {
+	it("Read two Result Sets via sp_multi_fetch", async function () {
 		const resultSets = await getSqlProvider()
 			.statement("SELECT * FROM sp_multi_fetch()")
 			.executeQueryMultiSets(DUMMY_CANCELLATION_TOKEN);
