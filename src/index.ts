@@ -7,9 +7,11 @@ import { financial } from "@zxteam/financial.js";
 import { Task, CancelledError } from "ptask.js";
 import { URL } from "url";
 import * as pg from "pg";
-// import * as mysql from "mysql";
+
 
 const FINACIAL_NUMBER_DEFAULT_FRACTION = 12;
+const DATA_TYPE_ID_EMPTY = 2278; // Return postgres if data is null
+const DATA_TYPE_ID_MULTI = 1790; // Return postgres if data is multy
 
 export class PostgresProviderFactory implements Factory<SqlProvider> {
 	private readonly _logger: Logger;
@@ -46,12 +48,6 @@ export class PostgresProviderFactory implements Factory<SqlProvider> {
 					} catch (e) {
 						throw new Error("Can't close postgres pool");
 					}
-					// (err) => {
-					// 		// all connections in the pool have ended
-					// 		if (err) { console.error(err); }
-					// 		// disposer should not raise any exceptions
-					// 		return closedResolve();
-					// 	});
 				});
 			}
 			return Promise.resolve();
@@ -195,7 +191,10 @@ class PostgresStatement implements SqlStatement {
 						}
 						const underlyingResultRows = underlyingResult.rows;
 						const underlyingResultFields = underlyingResult.fields;
-						if (underlyingResultRows.length > 0 && !(underlyingResultFields[0].dataTypeID === 2278)) {
+						if (underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_MULTI) {
+							return reject(new InvalidOperationError("executeQuery does not support multi request"));
+						}
+						if (underlyingResultRows.length > 0 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
 							return resolve(underlyingResultRows.map(row => new PostgresSqlResultRecord(row, underlyingResultFields)));
 						} else {
 							return resolve([]);
@@ -207,7 +206,11 @@ class PostgresStatement implements SqlStatement {
 
 	// tslint:disable-next-line:max-line-length
 	public executeQueryMultiSets(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Task<Array<Array<SqlResultRecord>>> {
-		throw new Error("not impl yet");
+		return Task.run((ct: CancellationToken) => {
+			return new Promise<Array<Array<SqlResultRecord>>>(async (resolve, reject) => {
+				return reject(new Error("Don't implement yet"));
+			});
+		}, cancellationToken);
 	}
 
 	public executeScalar(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Task<SqlData> {
@@ -237,7 +240,7 @@ class PostgresStatement implements SqlStatement {
 								return resolve(new PostgresData(value, fi));
 							}
 						}
-						return reject(new Error("Underlying MySql provider returns not enough data to complete request."));
+						return reject(new Error("Underlying Postgres provider returns not enough data to complete request."));
 					}));
 			});
 		}, cancellationToken);

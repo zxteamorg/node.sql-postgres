@@ -10,6 +10,18 @@ INSERT INTO "tb_1" VALUES ('two', 2);
 INSERT INTO "tb_1" VALUES ('three', 3);
 
 
+-- DROP TABLE IF EXISTS "tb_2";
+CREATE TABLE "tb_2" (
+	"id"         SERIAL,
+	"first_name" VARCHAR(32) NOT NULL,
+	"last_name"  VARCHAR(32) NOT NULL,
+	PRIMARY KEY ("id")
+);
+INSERT INTO "tb_2"("first_name","last_name") VALUES ('Maxim', 'Anurin');
+INSERT INTO "tb_2"("first_name","last_name") VALUES ('Serhii', 'Zghama');
+
+
+
 -- DROP FUNCTION IF EXISTS sp_contains;
 CREATE FUNCTION sp_contains("value" VARCHAR(128))
 	RETURNS bool
@@ -61,7 +73,7 @@ BEGIN
 	OPEN result1 FOR SELECT * FROM "tb_1";
 	RETURN NEXT result1;
 
-	OPEN result2 FOR SELECT * FROM "tb_1";
+	OPEN result2 FOR SELECT * FROM "tb_2";
 	RETURN NEXT result2;
 END;
 $BODY$;

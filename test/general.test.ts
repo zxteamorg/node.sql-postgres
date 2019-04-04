@@ -113,11 +113,16 @@ describe("PostgreSQL Tests", function () {
 		}
 	});
 
-	it.skip("Read TRUE from multi record set through executeScalar", async function () {
-		const result = await getSqlProvider()
-			.statement("SELECT * FROM sp_multi_fetch_ints()")
-			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
-		assert.equal(result.asBoolean, true);
+	it("Don't read TRUE from multi record set through executeScalar", async function () {
+		try {
+			const result = await getSqlProvider()
+				.statement("SELECT * FROM sp_multi_fetch_ints()")
+				.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
+		} catch (err) {
+			// assert.containsAllKeys(err, ["message"]);
+			assert.equal((<any>err).message, "executeQuery does not support multi request");
+			return;
+		}
 	});
 	it("Read TRUE as boolean through executeScalar", async function () {
 		const result = await getSqlProvider()
@@ -272,19 +277,17 @@ describe("PostgreSQL Tests", function () {
 		assert.equal(resultArray[1].get("varchar").asString, "two");
 		assert.equal(resultArray[2].get("varchar").asString, "three");
 	});
-	it.skip("Read (string and int)s through executeQuery (Multi record sets Stored Proc)", async function () {
-		const resultArray = await getSqlProvider()
-			.statement("SELECT * FROM sp_multi_fetch()")
-			.executeQuery(DUMMY_CANCELLATION_TOKEN);
-
-		assert.instanceOf(resultArray, Array);
-		assert.equal(resultArray.length, 3);
-		assert.equal(resultArray[0].get("varchar").asString, "one");
-		assert.equal(resultArray[0].get("int").asNumber, 1);
-		assert.equal(resultArray[1].get("varchar").asString, "two");
-		assert.equal(resultArray[1].get("int").asNumber, 2);
-		assert.equal(resultArray[2].get("varchar").asString, "three");
-		assert.equal(resultArray[2].get("int").asNumber, 3);
+	it("Don't read (string and int)s through executeQuery (Multi record sets Stored Proc)", async function () {
+		try {
+			await getSqlProvider()
+				.statement("SELECT * FROM sp_multi_fetch()")
+				.executeQuery(DUMMY_CANCELLATION_TOKEN);
+		} catch (err) {
+			// assert.containsAllKeys(err, ["message"]);
+			assert.equal((<any>err).message, "executeQuery does not support multi request");
+			return;
+		}
+		assert.fail("No exceptions", "Exception with code: ER_SP_DOES_NOT_EXIST");
 	});
 	it("Read empty result through executeQuery (SELECT)", async function () {
 		const resultArray = await getSqlProvider()
@@ -345,5 +348,35 @@ describe("PostgreSQL Tests", function () {
 		assert.equal(resultArrayAfterDestoroyTempTable[0].get("int").asNumber, 1);
 		assert.equal(resultArrayAfterDestoroyTempTable[0].get("varchar").asString, "one");
 	});
+	it.skip("Read two Result Sets via sp_multi_fetch", async function () {
+		const resultSets = await getSqlProvider()
+			.statement("SELECT * FROM sp_multi_fetch()")
+			.executeQueryMultiSets(DUMMY_CANCELLATION_TOKEN);
+		assert.isArray(resultSets);
+		assert.equal(resultSets.length, 2, "The procedure 'sp_multi_fetch' should return two result sets");
+
+		{ // Verify first result set
+			const firstResultSet = resultSets[0];
+			assert.isArray(firstResultSet);
+			assert.equal(firstResultSet.length, 3);
+			assert.equal(firstResultSet[0].get("varchar").asString, "one");
+			assert.equal(firstResultSet[0].get("int").asInteger, 1);
+			assert.equal(firstResultSet[1].get("varchar").asString, "two");
+			assert.equal(firstResultSet[1].get("int").asInteger, 2);
+			assert.equal(firstResultSet[2].get("varchar").asString, "three");
+			assert.equal(firstResultSet[2].get("int").asInteger, 3);
+		}
+
+		{ // Verify second result set
+			const secondResultSet = resultSets[1];
+			assert.isArray(secondResultSet);
+			assert.equal(secondResultSet.length, 2);
+			assert.equal(secondResultSet[0].get("first_name").asString, "Maxim");
+			assert.equal(secondResultSet[0].get("last_name").asString, "Anurin");
+			assert.equal(secondResultSet[1].get("first_name").asString, "Serhii");
+			assert.equal(secondResultSet[1].get("last_name").asString, "Zghama");
+		}
+	});
+
 });
 
