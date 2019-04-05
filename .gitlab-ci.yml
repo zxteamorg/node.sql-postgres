@@ -17,6 +17,6 @@ test:
     - name: registry.dev.zxteam.net/pub/docker/test/postgres10:1
       alias: postgres
   before_script:
-    - npm run prepare:initdb
+    - npm run prepare:devdb
   script:
     - npm run test

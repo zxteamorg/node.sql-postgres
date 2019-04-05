@@ -98,7 +98,7 @@ describe("PostgreSQL Tests", function () {
 		});
 		*/
 
-		sqlProviderFactory = new lib.PostgresProviderFactory({ url: getPostgresUrl() });
+		sqlProviderFactory = new lib.PostgresProviderFactory(getPostgresUrl());
 	});
 
 	beforeEach(async function () {

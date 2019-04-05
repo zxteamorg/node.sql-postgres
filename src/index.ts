@@ -1,6 +1,6 @@
 import { Factory, Logger, CancellationToken, Task as TaskLike, Financial as FinancialLike } from "@zxteam/contract";
 import {
-	SqlProvider, SqlStatement, SqlStatementParam, SqlResultRecord, SqlData, SqlTemporaryTable
+	SqlProviderFactory, SqlProvider, SqlStatement, SqlStatementParam, SqlResultRecord, SqlData, SqlTemporaryTable
 } from "@zxteam/contract.sql";
 import { Disposable, Initable } from "@zxteam/disposable";
 import { financial } from "@zxteam/financial.js";
@@ -25,7 +25,7 @@ function executeRunQuery(db: pg.PoolClient, sqlText: string, values: Array<SqlSt
 	});
 }
 
-export class PostgresProviderFactory implements Factory<SqlProvider> {
+export class PostgresProviderFactory implements SqlProviderFactory {
 	private readonly _logger: Logger;
 	private readonly _url: URL;
 
@@ -33,11 +33,11 @@ export class PostgresProviderFactory implements Factory<SqlProvider> {
 	private _postgresConnectionPool: pg.Pool | null;
 
 	// This implemenation wrap package https://www.npmjs.com/package/pg
-	public constructor(opts: { url: URL, logger?: Logger }) {
+	public constructor(url: URL, logger?: Logger) {
 		this._postgresConnectionPool = null;
 		this._providesCount = 0;
-		this._logger = opts.logger || new DummyLogger();
-		this._url = opts.url;
+		this._logger = logger || new DummyLogger();
+		this._url = url;
 
 		this._logger.trace("PostgresProviderFactory Constructed");
 	}
