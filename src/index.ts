@@ -3,7 +3,7 @@ import {
 	SqlProviderFactory, SqlProvider, SqlStatement, SqlStatementParam, SqlResultRecord, SqlData, SqlTemporaryTable
 } from "@zxteam/contract.sql";
 import { Disposable, Initable } from "@zxteam/disposable";
-import { financial } from "@zxteam/financial.js";
+import { financial, Financial } from "@zxteam/financial.js";
 import { Task, CancelledError } from "ptask.js";
 import { URL } from "url";
 import * as pg from "pg";
@@ -13,17 +13,6 @@ const FINACIAL_NUMBER_DEFAULT_FRACTION = 12;
 const DATA_TYPE_ID_EMPTY = 2278; // Return postgres if data is null
 const DATA_TYPE_ID_MULTI = 1790; // Return postgres if data is multy
 
-function executeRunQuery(db: pg.PoolClient, sqlText: string, values: Array<SqlStatementParam>): Promise<pg.QueryResult> {
-	return new Promise<pg.QueryResult>((resolve, reject) => {
-		db.query(sqlText, values,
-			(err: any, underlyingResult: pg.QueryResult) => {
-				if (err) {
-					return reject(err);
-				}
-				return resolve(underlyingResult);
-			});
-	});
-}
 
 export class PostgresProviderFactory implements SqlProviderFactory {
 	private readonly _logger: Logger;
@@ -162,114 +151,147 @@ class PostgresStatement implements SqlStatement {
 	}
 
 	public execute(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Task<void> {
-		return Task.run((ct: CancellationToken) => {
-			return new Promise<void>(async (resolve, reject) => {
-				if (this._logger.isTraceEnabled) {
-					this._logger.trace("Executing:", this._sqlText, values);
-				}
-				try {
-					await executeRunQuery(this._owner.postgresConnection, this._sqlText, values);
-					if (this._logger.isTraceEnabled) {
-						this._logger.trace("Executed");
-					}
-					resolve();
-				} catch (err) {
-					if (this._logger.isTraceEnabled) {
-						this._logger.trace("Executed with error:", err);
-					}
-					return reject(err);
-				}
-			});
+		return Task.run(async (ct: CancellationToken) => {
+			if (this._logger.isTraceEnabled) {
+				this._logger.trace("Executing:", this._sqlText, values);
+			}
+			await helpers.executeRunQuery(
+				this._owner.postgresConnection,
+				this._sqlText,
+				helpers.statementArgumentsAdapter(values)
+			);
+			if (this._logger.isTraceEnabled) {
+				this._logger.trace("Executed");
+			}
 		}, cancellationToken);
 	}
 
 	public executeQuery(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Task<Array<SqlResultRecord>> {
-		return Task.run((ct: CancellationToken) => {
-			return new Promise<Array<SqlResultRecord>>(async (resolve, reject) => {
-				if (this._logger.isTraceEnabled) {
-					this._logger.trace("Executing Query:", this._sqlText, values);
-				}
-				try {
-					const underlyingResult = await executeRunQuery(this._owner.postgresConnection, this._sqlText, values);
-					const underlyingResultRows = underlyingResult.rows;
-					const underlyingResultFields = underlyingResult.fields;
-					if (underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_MULTI) {
-						return reject(new InvalidOperationError("executeQuery does not support multi request"));
-					}
-					if (underlyingResultRows.length > 0 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
-						return resolve(underlyingResultRows.map(row => new PostgresSqlResultRecord(row, underlyingResultFields)));
-					} else {
-						return resolve([]);
-					}
-				} catch (e) {
-					return reject(e);
-				}
-			});
+		return Task.run(async (ct: CancellationToken) => {
+			if (this._logger.isTraceEnabled) {
+				this._logger.trace("Executing Query:", this._sqlText, values);
+			}
+
+			const underlyingResult = await helpers.executeRunQuery(
+				this._owner.postgresConnection,
+				this._sqlText,
+				helpers.statementArgumentsAdapter(values)
+			);
+
+			if (this._logger.isTraceEnabled) {
+				this._logger.trace("Executed Scalar:", underlyingResult);
+			}
+
+			const underlyingResultRows = underlyingResult.rows;
+			const underlyingResultFields = underlyingResult.fields;
+
+			this._logger.trace("Verify that this is not a multi-request");
+			if (underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_MULTI) {
+				this._logger.trace("This is a multi request. Raise exception.");
+				throw new InvalidOperationError("executeQuery does not support multi request");
+			}
+
+			if (underlyingResultRows.length > 0 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
+				this._logger.trace("Result create new SQLiteSqlResultRecord()");
+				return underlyingResultRows.map(row => new PostgresSqlResultRecord(row, underlyingResultFields));
+			} else {
+				this._logger.trace("Result is empty");
+				return [];
+			}
 		}, cancellationToken);
 	}
 
 	// tslint:disable-next-line:max-line-length
 	public executeQueryMultiSets(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Task<Array<Array<SqlResultRecord>>> {
-		function parsingValue(res: pg.QueryResult): Array<any> {
-			const rows = res.rows;
-			return rows.map((row) => row[Object.keys(row)[0]]);
-		}
-		return Task.run((ct: CancellationToken) => {
-			return new Promise<Array<Array<SqlResultRecord>>>(async (resolve, reject) => {
-				try {
-					// Begin transaction
-					await executeRunQuery(this._owner.postgresConnection, "BEGIN", []);
-					const resultFetchs = await executeRunQuery(this._owner.postgresConnection, this._sqlText, values);
-					if (resultFetchs.fields[0].dataTypeID !== DATA_TYPE_ID_MULTI) {
-						return reject(new InvalidOperationError(`executeQueryMultiSets cannot execute this script: ${this._sqlText}`));
-					}
-					const resultFetchsValue = parsingValue(resultFetchs);
-					const friendlyResult: Array<Array<SqlResultRecord>> = [];
-					for (let i = 0; i < resultFetchsValue.length; i++) {
-						const fetch = resultFetchsValue[i];
-						const queryFetchs = await executeRunQuery(this._owner.postgresConnection, `FETCH ALL IN "${fetch}";`, []);
-						friendlyResult.push(queryFetchs.rows.map(row => new PostgresSqlResultRecord(row, queryFetchs.fields)));
-					}
-					// Close transaction
-					await executeRunQuery(this._owner.postgresConnection, "COMMIT", []);
-					return resolve(friendlyResult);
-				} catch (err) {
-					return reject(err);
+		return Task.run(async (ct: CancellationToken) => {
+
+			this._logger.trace("Executing Query: BEGIN, []");
+			await helpers.executeRunQuery(this._owner.postgresConnection, "BEGIN", []);
+
+			this._logger.trace("Check cancellationToken for interrupt");
+			ct.throwIfCancellationRequested();
+
+			if (this._logger.isTraceEnabled) {
+				this._logger.trace("Executing Scalar:", this._sqlText, values);
+			}
+
+			const resultFetchs = await helpers.executeRunQuery(
+				this._owner.postgresConnection,
+				this._sqlText,
+				helpers.statementArgumentsAdapter(values)
+			);
+
+			this._logger.trace("Check cancellationToken for interrupt");
+			ct.throwIfCancellationRequested();
+
+			this._logger.trace("Verify that this is a multi-request");
+			if (resultFetchs.fields[0].dataTypeID !== DATA_TYPE_ID_MULTI) {
+				this._logger.trace("This is not a multi request. Raise exception.");
+				throw new InvalidOperationError(`executeQueryMultiSets cannot execute this script: ${this._sqlText}`);
+			}
+
+			const resultFetchsValue = helpers.parsingValue(resultFetchs);
+			const friendlyResult: Array<Array<SqlResultRecord>> = [];
+			for (let i = 0; i < resultFetchsValue.length; i++) {
+				const fetch = resultFetchsValue[i];
+
+				if (this._logger.isTraceEnabled) {
+					this._logger.trace("Executing Scalar:", `FETCH ALL IN "${fetch}";`);
 				}
-			});
+
+				const queryFetchs = await helpers.executeRunQuery(this._owner.postgresConnection, `FETCH ALL IN "${fetch}";`, []);
+
+				this._logger.trace("Check cancellationToken for interrupt");
+				ct.throwIfCancellationRequested();
+
+				friendlyResult.push(queryFetchs.rows.map(row => new PostgresSqlResultRecord(row, queryFetchs.fields)));
+			}
+
+			this._logger.trace("Executing Scalar: COMMIT;");
+			await helpers.executeRunQuery(this._owner.postgresConnection, "COMMIT", []);
+
+			if (this._logger.isTraceEnabled) {
+				this._logger.trace("return friendly data: ", friendlyResult);
+			}
+
+			return friendlyResult;
 		}, cancellationToken);
 	}
 
 	public executeScalar(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Task<SqlData> {
-		return Task.run((ct: CancellationToken) => {
-			return new Promise<SqlData>((resolve, reject) => {
-				if (this._logger.isTraceEnabled) {
-					this._logger.trace("Executing Scalar:", this._sqlText, values);
+		return Task.run(async (ct: CancellationToken) => {
+			if (this._logger.isTraceEnabled) {
+				this._logger.trace("Executing Scalar:", this._sqlText, values);
+			}
+
+			const underlyingResult = await helpers.executeRunQuery(
+				this._owner.postgresConnection,
+				this._sqlText,
+				helpers.statementArgumentsAdapter(values)
+			);
+
+			if (this._logger.isTraceEnabled) {
+				this._logger.trace("Executed Scalar:", underlyingResult);
+			}
+
+			const underlyingRows = underlyingResult.rows;
+			const underlyingFields = underlyingResult.fields;
+			if (underlyingRows.length > 0) {
+				const underlyingFirstRow = underlyingRows[0];
+				const value = underlyingFirstRow[Object.keys(underlyingFirstRow)[0]];
+				const fi = underlyingFields[0];
+				if (value !== undefined || fi !== undefined) {
+					return new PostgresData(value, fi);
+				} else {
+					if (this._logger.isTraceEnabled) {
+						this._logger.trace(`Bad argument ${value} and ${fi}`);
+					}
+					throw new ArgumentError(`Bad argument ${value} and ${fi}`);
 				}
-				this._owner.postgresConnection.query(this._sqlText, values, (
-					(err: any, underlyingResult: pg.QueryResult) => {
-						if (err) {
-							if (this._logger.isTraceEnabled) {
-								this._logger.trace("Executed Scalar with error:", err);
-							}
-							return reject(err);
-						}
-						if (this._logger.isTraceEnabled) {
-							this._logger.trace("Executed Scalar:", underlyingResult);
-						}
-						const underlyingRows = underlyingResult.rows;
-						const underlyingFields = underlyingResult.fields;
-						if (underlyingRows.length > 0) {
-							const underlyingFirstRow = underlyingRows[0];
-							const value = underlyingFirstRow[Object.keys(underlyingFirstRow)[0]];
-							const fi = underlyingFields[0];
-							if (value !== undefined || fi !== undefined) {
-								return resolve(new PostgresData(value, fi));
-							}
-						}
-						return reject(new Error("Underlying Postgres provider returns not enough data to complete request."));
-					}));
-			});
+			} else {
+				this._logger.trace("Underlying Postgres provider returns not enough data to complete request. Raise exception.");
+				throw new Error("Underlying Postgres provider returns not enough data to complete request.");
+			}
 		}, cancellationToken);
 	}
 }
@@ -542,4 +564,33 @@ class DummyLogger implements Logger {
 	public fatal(message: string, ...args: any[]): void {
 		// dummy
 	}
+}
+
+namespace helpers {
+	export function executeRunQuery(db: pg.PoolClient, sqlText: string, values: Array<SqlStatementParam>): Promise<pg.QueryResult> {
+		return new Promise<pg.QueryResult>((resolve, reject) => {
+			db.query(sqlText, values,
+				(err: any, underlyingResult: pg.QueryResult) => {
+					if (err) {
+						return reject(err);
+					}
+					return resolve(underlyingResult);
+				});
+		});
+	}
+	export function statementArgumentsAdapter(args: Array<SqlStatementParam>): Array<any> {
+		return args.map(value => {
+			if (typeof value === "object") {
+				if (value !== null && Financial.isFinancialLike(value)) {
+					return Financial.toString(value);	 // Financial should be converted to string
+				}
+			}
+			return value;
+		});
+	}
+	export function parsingValue(res: pg.QueryResult): Array<any> {
+		const rows = res.rows;
+		return rows.map((row) => row[Object.keys(row)[0]]);
+	}
+
 }

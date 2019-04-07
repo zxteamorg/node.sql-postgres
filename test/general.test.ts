@@ -4,6 +4,7 @@ import ensureFactory from "@zxteam/ensure.js";
 import { SqlProvider } from "@zxteam/contract.sql";
 
 import * as lib from "../src";
+import { Financial } from "@zxteam/financial.js";
 
 declare global {
 	namespace Chai {
@@ -348,6 +349,27 @@ describe("PostgreSQL Tests", function () {
 		assert.equal(resultArrayAfterDestoroyTempTable[0].get("int").asNumber, 1);
 		assert.equal(resultArrayAfterDestoroyTempTable[0].get("varchar").asString, "one");
 	});
+
+	it.only("Should be able to pass null into executeScalar args", async function () {
+		const result1 = await getSqlProvider()
+			.statement("SELECT 1 WHERE $1 IS NULL")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN, null);
+		assert.equal(result1.asInteger, 1);
+	});
+
+	it.only("Should be able to pass null into executeQuery args", async function () {
+		const result2 = await getSqlProvider()
+			.statement("SELECT 1 WHERE $1 IS NULL")
+			.executeQuery(DUMMY_CANCELLATION_TOKEN, 0);
+		assert.equal(result2.length, 0);
+	});
+	it("Should be able to pass Financial into query args", async function () {
+		const result1 = await getSqlProvider()
+			.statement("SELECT $1")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN, Financial.parse("42.123"));
+		assert.equal(result1.asString, "42.123");
+	});
+
 	it("Read two Result Sets via sp_multi_fetch", async function () {
 		const resultSets = await getSqlProvider()
 			.statement("SELECT * FROM sp_multi_fetch()")
