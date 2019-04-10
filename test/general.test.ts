@@ -350,16 +350,16 @@ describe("PostgreSQL Tests", function () {
 		assert.equal(resultArrayAfterDestoroyTempTable[0].get("varchar").asString, "one");
 	});
 
-	it.only("Should be able to pass null into executeScalar args", async function () {
+	it("Should be able to pass null into executeScalar args", async function () {
 		const result1 = await getSqlProvider()
-			.statement("SELECT 1 WHERE $1 IS NULL")
+			.statement("SELECT 1 WHERE $1::int IS NULL")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN, null);
 		assert.equal(result1.asInteger, 1);
 	});
 
-	it.only("Should be able to pass null into executeQuery args", async function () {
+	it("Should be able to pass null into executeQuery args", async function () {
 		const result2 = await getSqlProvider()
-			.statement("SELECT 1 WHERE $1 IS NULL")
+			.statement("SELECT 1 WHERE $1::int IS null;")
 			.executeQuery(DUMMY_CANCELLATION_TOKEN, 0);
 		assert.equal(result2.length, 0);
 	});
