@@ -1,6 +1,6 @@
 {
 	"name": "@zxteam/sql.postgres",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"description": "ZXTeam's SQL implementation for PostgreSQL",
 	"main": "./src/index.js",
 	"types": "./src/index.d.ts",
@@ -24,10 +24,10 @@
 	},
 	"dependencies": {
 		"@types/pg": "^7.4.14",
-		"@zxteam/contract": "^3.2.1",
-		"@zxteam/contract.sql": "^3.2.5",
-		"@zxteam/disposable": "^3.0.2",
-		"@zxteam/financial.js": "^3.0.3",
+		"@zxteam/contract": "^3.2.4",
+		"@zxteam/contract.sql": "^3.2.6",
+		"@zxteam/disposable": "^3.2.2",
+		"@zxteam/financial.js": "^3.2.1",
 		"pg": "^7.9.0",
 		"ptask.js": "^3.2.1"
 	},
