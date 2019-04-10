@@ -7,6 +7,7 @@ import { financial, Financial } from "@zxteam/financial.js";
 import { Task, CancelledError } from "ptask.js";
 import { URL } from "url";
 import * as pg from "pg";
+const { Client } = require("pg");
 
 
 const FINACIAL_NUMBER_DEFAULT_FRACTION = 12;
@@ -18,13 +19,8 @@ export class PostgresProviderFactory implements SqlProviderFactory {
 	private readonly _logger: Logger;
 	private readonly _url: URL;
 
-	private _providesCount: number;
-	private _postgresConnectionPool: pg.Pool | null;
-
 	// This implemenation wrap package https://www.npmjs.com/package/pg
 	public constructor(url: URL, logger?: Logger) {
-		this._postgresConnectionPool = null;
-		this._providesCount = 0;
 		this._logger = logger || new DummyLogger();
 		this._url = url;
 
@@ -32,69 +28,37 @@ export class PostgresProviderFactory implements SqlProviderFactory {
 	}
 
 	public create(cancellationToken?: CancellationToken): Task<SqlProvider> {
-		const disposer = (connection: pg.PoolClient): Promise<void> => {
-			connection.release();
-			--this._providesCount;
-			if (this._providesCount === 0) {
-				return new Promise((closedResolve) => {
-					if (this._postgresConnectionPool === null) {
-						console.error("VERY UNEXPECTED ERROR! This should never happen! postgresConnectionPool === null while last provider is disposing");
-						return closedResolve();
-					}
-					const mysqlConnectionPool = this._postgresConnectionPool;
-					this._postgresConnectionPool = null;
-					try {
-						mysqlConnectionPool.end();
-						return closedResolve();
-					} catch (e) {
-						throw new Error("Can't close postgres pool");
-					}
-				});
-			}
-			return Promise.resolve();
-		};
-		return Task.run((ct) => new Promise<SqlProvider>((resolve, reject) => {
+		return Task.run(async (ct) => {
 			this._logger.trace("Creating Postgres SqlProvider..");
 
-			if (ct.isCancellationRequested) { return reject(new CancelledError()); }
+			this._logger.trace("Check cancellationToken for interrupt");
+			if (ct.isCancellationRequested) { throw new CancelledError(); }
 
-			if (this._postgresConnectionPool === null) {
-				this._postgresConnectionPool = new pg.Pool({
-					host: this._url.hostname,
-					port: this._url.port !== undefined ? Number.parseInt(this._url.port) : 5432,
-					user: this._url.username,
-					password: this._url.password,
-					database: this._url.pathname.substr(1) // skip first symbol '/'
-				});
+			if (this._logger.isTraceEnabled) {
+				this._logger.trace(`Opening the database url: ${this._url}`);
 			}
+			const client = await helpers.openDatabase(this._url);
 
-			const mysqlConnectionPool = this._postgresConnectionPool;
-			return mysqlConnectionPool.connect((err, connection) => {
-				if (err) {
-					this._logger.trace("Failed to create Postgres SqlProvider", err);
-					if (this._providesCount === 0) {
-						return mysqlConnectionPool.end();
-					} else {
-						return reject(err);
-					}
+			try {
+				this._logger.trace("Check cancellationToken for interrupt");
+				ct.throwIfCancellationRequested();
+
+				const sqlProvider: SqlProvider = new PostgresProvider(
+					client,
+					() => helpers.closeDatabase(client),
+					this._logger
+				);
+
+				if (this._logger.isTraceEnabled) {
+					this._logger.trace(`The database url ${this._url} was opened successfully`);
 				}
 
-				if (ct.isCancellationRequested) { return reject(new CancelledError()); }
-
-				try {
-					this._logger.trace("Created Postgres SqlProvider");
-
-					const sqlProvider: SqlProvider = new PostgresProvider(connection, () => disposer(connection), this._logger);
-					++this._providesCount;
-					this._logger.trace("Created MySQL SqlProvider");
-					return resolve(sqlProvider);
-				} catch (e) {
-					connection.release();
-					this._logger.trace("Failed to create MySQL SqlProvider", e);
-					return reject(e);
-				}
-			});
-		}), cancellationToken);
+				return sqlProvider;
+			} catch (e) {
+				await helpers.closeDatabase(client);
+				throw e;
+			}
+		}, cancellationToken);
 	}
 }
 
@@ -104,10 +68,10 @@ class ArgumentError extends Error { }
 class InvalidOperationError extends Error { }
 
 class PostgresProvider extends Disposable implements SqlProvider {
-	public readonly postgresConnection: pg.PoolClient;
+	public readonly postgresConnection: pg.Client;
 	private readonly _logger: Logger;
 	private readonly _disposer: () => Promise<void>;
-	public constructor(postgresConnection: pg.PoolClient, disposer: () => Promise<void>, logger: Logger) {
+	public constructor(postgresConnection: pg.Client, disposer: () => Promise<void>, logger: Logger) {
 		super();
 		this.postgresConnection = postgresConnection;
 		this._disposer = disposer;
@@ -567,7 +531,32 @@ class DummyLogger implements Logger {
 }
 
 namespace helpers {
-	export function executeRunQuery(db: pg.PoolClient, sqlText: string, values: Array<SqlStatementParam>): Promise<pg.QueryResult> {
+	export function openDatabase(url: URL): Promise<pg.Client> {
+		return new Promise((resolve, reject) => {
+			const client: pg.Client = new Client({
+				host: url.hostname,
+				port: url.port !== undefined ? Number.parseInt(url.port) : 5432,
+				user: url.username,
+				password: url.password,
+				database: url.pathname.substr(1) // skip first symbol '/'
+			});
+			client.connect(err => {
+				if (err) {
+					return reject(err);
+				}
+				return resolve(client);
+			});
+		});
+	}
+	export function closeDatabase(db: pg.Client): Promise<void> {
+		return new Promise((resolve, reject) => {
+			db.end((error) => {
+				if (error) { return reject(error); }
+				return resolve();
+			});
+		});
+	}
+	export function executeRunQuery(db: pg.Client, sqlText: string, values: Array<SqlStatementParam>): Promise<pg.QueryResult> {
 		return new Promise<pg.QueryResult>((resolve, reject) => {
 			db.query(sqlText, values,
 				(err: any, underlyingResult: pg.QueryResult) => {
