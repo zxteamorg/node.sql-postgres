@@ -114,16 +114,20 @@ describe("PostgreSQL Tests", function () {
 		}
 	});
 
-	it("Don't read TRUE from multi record set through executeScalar", async function () {
+	it("executeScalar should raise error with text 'does not support multiset request yet' for MultiSet SQL Response", async function () {
+		let expectedError!: Error;
+
 		try {
 			const result = await getSqlProvider()
 				.statement("SELECT * FROM sp_multi_fetch_ints()")
-				.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
+				.executeScalar(DUMMY_CANCELLATION_TOKEN);
 		} catch (err) {
-			// assert.containsAllKeys(err, ["message"]);
-			assert.equal((<any>err).message, "executeQuery does not support multi request");
-			return;
+			expectedError = err;
 		}
+
+		assert.isDefined(expectedError);
+		assert.instanceOf(expectedError, Error);
+		assert.include(expectedError.message, "does not support multiset request yet");
 	});
 	it("Read TRUE as boolean through executeScalar", async function () {
 		const result = await getSqlProvider()
