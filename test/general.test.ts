@@ -1,10 +1,11 @@
 import * as chai from "chai";
-import { Factory, CancellationToken } from "@zxteam/contract";
-import ensureFactory from "@zxteam/ensure.js";
-import { SqlProvider } from "@zxteam/contract.sql";
+import { CancellationToken, Financial } from "@zxteam/contract";
+import ensureFactory from "@zxteam/ensure";
+import { SqlProvider } from "@zxteam/sql";
 
 import * as lib from "../src";
-import { Financial } from "@zxteam/financial.js";
+import financial from "@zxteam/financial";
+//import { Financial } from "@zxteam/financial";
 
 declare global {
 	namespace Chai {
@@ -42,7 +43,7 @@ const DUMMY_CANCELLATION_TOKEN: CancellationToken = {
 	throwIfCancellationRequested(): void { /* STUB */ }
 };
 
-function getPostgresUrl(): URL {
+function getOpts(): lib.PostgresProviderFactory.Opts {
 	function parseDbServerUrl(url: string): URL {
 		try {
 			return new URL(url);
@@ -59,13 +60,13 @@ function getPostgresUrl(): URL {
 				const port = 5432;
 				const user = "devtest";
 				const postgresUrl = new URL(`postgres://${user}@${host}:${port}/emptytestdb`);
-				return postgresUrl;
+				return { url: postgresUrl };
 			}
 		}
 
 		const url = parseDbServerUrl(urlStr);
 		switch (url.protocol) {
-			case "postgres:": return url;
+			case "postgres:": return { url };
 			default:
 				throw new Error(`Not supported DB Server protocol = ${process.env.TEST_DB_URL}`);
 		}
@@ -76,7 +77,7 @@ function getPostgresUrl(): URL {
 
 
 describe("PostgreSQL Tests", function () {
-	let sqlProviderFactory: Factory<SqlProvider>;
+	let sqlProviderFactory: lib.PostgresProviderFactory;
 	let sqlProvider: SqlProvider | null;
 
 	function getSqlProvider(): SqlProvider {
@@ -99,12 +100,12 @@ describe("PostgreSQL Tests", function () {
 		});
 		*/
 
-		sqlProviderFactory = new lib.PostgresProviderFactory(getPostgresUrl());
+		sqlProviderFactory = new lib.PostgresProviderFactory(getOpts());
 	});
 
 	beforeEach(async function () {
 		// runs before each test in this block
-		sqlProvider = await sqlProviderFactory.create();
+		sqlProvider = await sqlProviderFactory.create(DUMMY_CANCELLATION_TOKEN);
 	});
 	afterEach(async function () {
 		// runs after each test in this block
@@ -203,16 +204,14 @@ describe("PostgreSQL Tests", function () {
 			.statement("SELECT 11.42 AS c0, 12 AS c1 UNION SELECT 21, 22")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		const v = result.asFinancial;
-		assert.equal(v.value, "1142");
-		assert.equal(v.fraction, 2);
+		assert.equal(v.toString(), "11.42");
 	});
 	it("Read '11.42' as FinancialLike through executeScalar", async function () {
 		const result = await getSqlProvider()
 			.statement("SELECT '11.42' AS c0, '12' AS c1 UNION SELECT '21', '22'")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		const v = result.asFinancial;
-		assert.equal(v.value, "1142");
-		assert.equal(v.fraction, 2);
+		assert.equal(v.toString(), "11.42");
 	});
 
 	it("Read 2018-05-01T12:01:03.345 as Date through executeScalar", async function () {
@@ -282,17 +281,20 @@ describe("PostgreSQL Tests", function () {
 		assert.equal(resultArray[1].get("varchar").asString, "two");
 		assert.equal(resultArray[2].get("varchar").asString, "three");
 	});
-	it("Don't read (string and int)s through executeQuery (Multi record sets Stored Proc)", async function () {
+	it("executeQuery should raise error with text 'does not support multiset request yet' for MultiSet SQL Response", async function () {
+		let expectedError!: Error;
+
 		try {
 			await getSqlProvider()
 				.statement("SELECT * FROM sp_multi_fetch()")
 				.executeQuery(DUMMY_CANCELLATION_TOKEN);
 		} catch (err) {
-			// assert.containsAllKeys(err, ["message"]);
-			assert.equal((<any>err).message, "executeQuery does not support multi request");
-			return;
+			expectedError = err;
 		}
-		assert.fail("No exceptions", "Exception with code: ER_SP_DOES_NOT_EXIST");
+
+		assert.isDefined(expectedError);
+		assert.instanceOf(expectedError, Error);
+		assert.include(expectedError.message, "does not support multiset request yet");
 	});
 	it("Read empty result through executeQuery (SELECT)", async function () {
 		const resultArray = await getSqlProvider()
@@ -370,7 +372,7 @@ describe("PostgreSQL Tests", function () {
 	it("Should be able to pass Financial into query args", async function () {
 		const result1 = await getSqlProvider()
 			.statement("SELECT $1")
-			.executeScalar(DUMMY_CANCELLATION_TOKEN, Financial.parse("42.123"));
+			.executeScalar(DUMMY_CANCELLATION_TOKEN, financial.parse("42.123"));
 		assert.equal(result1.asString, "42.123");
 	});
 
