@@ -38,7 +38,7 @@
 		"@zxteam/contract": "^6.0.35",
 		"@zxteam/disposable": "^6.0.23",
 		"@zxteam/errors": "^6.0.33",
-		"@zxteam/financial": "^6.0.21",
+		"@zxteam/financial": "^6.0.36",
 		"@zxteam/sql": "^6.0.35",
 		"lodash": "^4.17.15",
 		"pg": "^7.14.0"

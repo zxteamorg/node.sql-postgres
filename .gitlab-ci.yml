@@ -6,6 +6,7 @@ cache:
 
 test:
   stage: test
+  image: docker.registry.zxteam.net/pub/docker/build/node10.protoc-mysqlcli-psqlcli:1
   dependencies:
     - build
   variables:
