@@ -1,6 +1,4 @@
-include: 'http://dev.zxteam.net/maxim.anurin/gitlab-pipelines/raw/master/node/internal-lib.yml'
-
-image: docker.registry.zxteam.net/pub/docker/build/node10.protoc-mysqlcli-psqlcli:1
+include: 'http://dev.zxteam.net/maxim.anurin/gitlab-pipelines/raw/master/node/public-lib.yml'
 
 cache:
   paths:
@@ -16,7 +14,6 @@ test:
   services:
     - name: docker.registry.zxteam.net/pub/docker/test/postgres10:1
       alias: postgres
-  before_script:
-    - npm run prepare:devdb
   script:
+    - npm run prepare:devdb
     - npm run test
