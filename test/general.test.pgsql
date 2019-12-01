@@ -21,6 +21,16 @@ INSERT INTO "tb_2"("first_name","last_name") VALUES ('Maxim', 'Anurin');
 INSERT INTO "tb_2"("first_name","last_name") VALUES ('Serhii', 'Zghama');
 
 
+-- DROP TABLE IF EXISTS "tb_dates_test";
+SET TIMEZONE = 'UTC'; 
+CREATE TABLE "tb_dates_test" (
+	"id"         SERIAL,
+	"ts"        TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'utc'),
+	"tstz"      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+	PRIMARY KEY ("id")
+);
+INSERT INTO "tb_dates_test"("ts","tstz") VALUES ('2016-06-22 19:00:00.410', '2016-06-22 19:00:00.410');
+
 
 -- DROP FUNCTION IF EXISTS sp_contains;
 CREATE FUNCTION sp_contains("value" VARCHAR(128))

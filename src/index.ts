@@ -1,8 +1,11 @@
 import { CancellationToken, Financial, Logger } from "@zxteam/contract";
 import { Disposable, Initable } from "@zxteam/disposable";
-import { ArgumentError, CancelledError, InvalidOperationError } from "@zxteam/errors";
+import { ArgumentError, CancelledError, InvalidOperationError, wrapErrorIfNeeded } from "@zxteam/errors";
 import { financial } from "@zxteam/financial";
-import { SqlProviderFactory, SqlProvider, SqlStatement, SqlStatementParam, SqlResultRecord, SqlData, SqlTemporaryTable, SqlDialect } from "@zxteam/sql";
+import {
+	SqlProviderFactory, SqlProvider, SqlStatement, SqlStatementParam, SqlResultRecord, SqlData,
+	SqlTemporaryTable, SqlDialect, SqlError, SqlSyntaxError, SqlConstraintError
+} from "@zxteam/sql";
 
 import * as _ from "lodash";
 import * as pg from "pg";
@@ -617,6 +620,32 @@ namespace helpers {
 					}
 					return resolve(underlyingResult);
 				});
+		}).catch(function (reason) {
+			const err = wrapErrorIfNeeded(reason);
+
+			if ("code" in reason) {
+				const code = reason.code;
+				// https://www.postgresql.org/docs/12/errcodes-appendix.html
+				switch (code) {
+					case "21000":
+					case "23000":
+					case "23001":
+					case "23502":
+					case "23503":
+					case "23505":
+					case "23514":
+					case "23P01":
+					case "27000":
+					case "40002":
+					case "42000":
+					case "44000":
+						throw new SqlConstraintError(`SQL Constrain restriction happened: ${err.message}`, "???", err);
+					case "42000":
+					case "42601":
+						throw new SqlSyntaxError(`Looks like wrong SQL syntax detected: ${err.message}. See innerError for details.`, err);
+				}
+			}
+			throw new SqlError(`Unexpected error: ${err.message}`, err);
 		});
 	}
 	export function statementArgumentsAdapter(args: Array<SqlStatementParam>): Array<any> {

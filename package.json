@@ -1,6 +1,6 @@
 {
 	"name": "@zxteam/sql-postgres",
-	"version": "6.0.36",
+	"version": "6.0.38",
 	"description": "ZXTeam's SQL implementation for PostgreSQL",
 	"main": "./src/index.js",
 	"types": "./src/index.d.ts",
@@ -39,7 +39,7 @@
 		"@zxteam/disposable": "^6.0.23",
 		"@zxteam/errors": "^6.0.33",
 		"@zxteam/financial": "^6.0.36",
-		"@zxteam/sql": "^6.0.35",
+		"@zxteam/sql": "^6.0.38",
 		"lodash": "^4.17.15",
 		"pg": "^7.14.0"
 	},
