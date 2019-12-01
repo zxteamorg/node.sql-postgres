@@ -1,4 +1,5 @@
 import { CancellationToken, Financial, Logger } from "@zxteam/contract";
+import { DUMMY_CANCELLATION_TOKEN } from "@zxteam/cancellation";
 import { Disposable, Initable } from "@zxteam/disposable";
 import { ArgumentError, CancelledError, InvalidOperationError, wrapErrorIfNeeded } from "@zxteam/errors";
 import { financial } from "@zxteam/financial";
@@ -84,6 +85,53 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 			throw e;
 		}
 	}
+
+	public usingProvider<T>(
+		cancellationToken: CancellationToken,
+		worker: (sqlProvder: SqlProvider) => T | Promise<T>
+	): Promise<T> {
+		const executionPromise: Promise<T> = (async () => {
+			const sqlProvider: SqlProvider = await this.create(cancellationToken);
+			try {
+				return await worker(sqlProvider);
+			} finally {
+				await sqlProvider.dispose();
+			}
+		})();
+
+		// this._activeProviderUsings.add(executionPromise);
+
+		// executionPromise.catch(function () { /* BYPASS */ }).finally(() => {
+		// 	this._activeProviderUsings.delete(executionPromise);
+		// });
+
+		return executionPromise;
+	}
+
+	public usingProviderWithTransaction<T>(
+		cancellationToken: CancellationToken, worker: (sqlProvder: SqlProvider) => T | Promise<T>
+	): Promise<T> {
+		return this.usingProvider(cancellationToken, async (sqlProvider: SqlProvider) => {
+			await sqlProvider.statement("BEGIN TRANSACTION").execute(cancellationToken);
+			try {
+				let result: T;
+				const workerResult = worker(sqlProvider);
+				if (workerResult instanceof Promise) {
+					result = await workerResult;
+				} else {
+					result = workerResult;
+				}
+				// We have not to cancel this operation, so pass DUMMY_CANCELLATION_TOKEN
+				await sqlProvider.statement("COMMIT TRANSACTION").execute(DUMMY_CANCELLATION_TOKEN);
+				return result;
+			} catch (e) {
+				// We have not to cancel this operation, so pass DUMMY_CANCELLATION_TOKEN
+				await sqlProvider.statement("ROLLBACK TRANSACTION").execute(DUMMY_CANCELLATION_TOKEN);
+				throw e;
+			}
+		});
+	}
+
 
 	protected onInit(cancellationToken: CancellationToken): void | Promise<void> {
 		//

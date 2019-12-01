@@ -76,7 +76,7 @@ function getOpts(): PostgresProviderFactory.Opts {
 }
 
 
-describe("PostgreSQL Tests", function () {
+describe("PostgreSQL Tests 1", function () {
 	let sqlProviderFactory: PostgresProviderFactory;
 	let sqlProvider: SqlProvider | null = null;
 
@@ -101,6 +101,11 @@ describe("PostgreSQL Tests", function () {
 		*/
 
 		sqlProviderFactory = new PostgresProviderFactory(getOpts());
+	});
+	after(async function () {
+		if (sqlProviderFactory) {
+			await sqlProviderFactory.dispose();
+		}
 	});
 
 	beforeEach(async function () {
@@ -544,5 +549,80 @@ describe("PostgreSQL Tests", function () {
 		assert.isDefined(expectedError);
 		assert.instanceOf(expectedError, SqlConstraintError);
 		assert.isDefined(expectedError.innerError);
+	});
+});
+
+
+describe("PostgreSQL Tests via usingProvider", function () {
+	let sqlProviderFactory: PostgresProviderFactory;
+
+	before(async function () {
+		// runs before all tests in this block
+
+		// Uncomment rows below to enable trace log
+		/*
+		configure({
+			appenders: {
+				out: { type: "console" }
+			},
+			categories: {
+				default: { appenders: ["out"], level: "trace" }
+			}
+		});
+		*/
+
+		sqlProviderFactory = new PostgresProviderFactory(getOpts());
+	});
+	after(async function () {
+		if (sqlProviderFactory) {
+			await sqlProviderFactory.dispose();
+		}
+	});
+
+
+	it("Read TRUE as boolean through executeScalar", function () {
+		return sqlProviderFactory.usingProvider(DUMMY_CANCELLATION_TOKEN, async (sqlProvider) => {
+			const result = await sqlProvider
+				.statement("SELECT TRUE AS c0, FALSE AS c1 UNION ALL SELECT FALSE, FALSE")
+				.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
+			assert.equal(result.asBoolean, true);
+		});
+	});
+});
+
+
+describe("PostgreSQL Tests via usingProviderWithTransaction", function () {
+	let sqlProviderFactory: PostgresProviderFactory;
+
+	before(async function () {
+		// runs before all tests in this block
+
+		// Uncomment rows below to enable trace log
+		/*
+		configure({
+			appenders: {
+				out: { type: "console" }
+			},
+			categories: {
+				default: { appenders: ["out"], level: "trace" }
+			}
+		});
+		*/
+
+		sqlProviderFactory = new PostgresProviderFactory(getOpts());
+	});
+	after(async function () {
+		if (sqlProviderFactory) {
+			await sqlProviderFactory.dispose();
+		}
+	});
+
+	it("Read TRUE as boolean through executeScalar", function () {
+		return sqlProviderFactory.usingProviderWithTransaction(DUMMY_CANCELLATION_TOKEN, async (sqlProvider) => {
+			const result = await sqlProvider
+				.statement("SELECT TRUE AS c0, FALSE AS c1 UNION ALL SELECT FALSE, FALSE")
+				.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
+			assert.equal(result.asBoolean, true);
+		});
 	});
 });
