@@ -1,11 +1,16 @@
 import { CancellationToken, Financial, Logger } from "@zxteam/contract";
 import { DUMMY_CANCELLATION_TOKEN } from "@zxteam/cancellation";
 import { Disposable, Initable } from "@zxteam/disposable";
-import { ArgumentError, CancelledError, InvalidOperationError, wrapErrorIfNeeded } from "@zxteam/errors";
+import {
+	ArgumentError, CancelledError, InvalidOperationError,
+	wrapErrorIfNeeded, AggregateError
+} from "@zxteam/errors";
 import { financial } from "@zxteam/financial";
 import {
-	SqlProviderFactory, SqlProvider, SqlStatement, SqlStatementParam, SqlResultRecord, SqlData,
-	SqlTemporaryTable, SqlDialect, SqlError, SqlSyntaxError, SqlConstraintError
+	SqlProviderFactory, SqlProvider, SqlStatement,
+	SqlStatementParam, SqlResultRecord, SqlData,
+	SqlTemporaryTable, SqlDialect, SqlError,
+	SqlSyntaxError, SqlConstraintError, SqlNoSuchRecordError
 } from "@zxteam/sql";
 
 import * as _ from "lodash";
@@ -125,8 +130,12 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 				await sqlProvider.statement("COMMIT TRANSACTION").execute(DUMMY_CANCELLATION_TOKEN);
 				return result;
 			} catch (e) {
-				// We have not to cancel this operation, so pass DUMMY_CANCELLATION_TOKEN
-				await sqlProvider.statement("ROLLBACK TRANSACTION").execute(DUMMY_CANCELLATION_TOKEN);
+				try {
+					// We have not to cancel this operation, so pass DUMMY_CANCELLATION_TOKEN
+					await sqlProvider.statement("ROLLBACK TRANSACTION").execute(DUMMY_CANCELLATION_TOKEN);
+				} catch (e2) {
+					throw new AggregateError([e, e2]);
+				}
 				throw e;
 			}
 		});
@@ -198,9 +207,7 @@ class PostgresSqlProvider extends Disposable implements SqlProvider {
 	}
 
 	protected async onDispose(): Promise<void> {
-		this.log.trace("Disposing");
 		await this._disposer();
-		this.log.trace("Disposed");
 	}
 }
 
@@ -211,7 +218,6 @@ class PostgresSqlStatement implements SqlStatement {
 	public constructor(owner: PostgresSqlProvider, sql: string) {
 		this._owner = owner;
 		this._sqlText = sql;
-		this._owner.log.trace("PostgresSqlStatement constructed");
 	}
 
 	public async execute(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Promise<void> {
@@ -238,10 +244,12 @@ class PostgresSqlStatement implements SqlStatement {
 			throw new InvalidOperationError("executeQuery does not support multi request");
 		}
 
-		if (underlyingResultRows.length === 1 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
+		if (underlyingResultRows.length === 0) {
+			throw new SqlNoSuchRecordError(`executeSingle: No record for query ${this._sqlText}`);
+		} else if (underlyingResultRows.length === 1 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
 			return new PostgresSqlResultRecord(underlyingResultRows[0], underlyingResultFields);
 		} else {
-			throw new InvalidOperationError("SQL query returns non-single result");
+			throw new InvalidOperationError("executeSingle: SQL query returns non-single result");
 		}
 	}
 
@@ -259,7 +267,7 @@ class PostgresSqlStatement implements SqlStatement {
 		const underlyingResultFields = underlyingResult.fields;
 
 		if (underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_MULTI) {
-			throw new InvalidOperationError("executeQuery does not support multiset request yet");
+			throw new InvalidOperationError("executeQuery: does not support multiset request yet");
 		}
 
 		if (underlyingResultRows.length > 0 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
@@ -289,7 +297,7 @@ class PostgresSqlStatement implements SqlStatement {
 			// Verify that this is a multi-request
 			if (resultFetchs.fields[0].dataTypeID !== DATA_TYPE_ID_MULTI) {
 				// This is not a multi request. Raise exception.
-				throw new InvalidOperationError(`executeQueryMultiSets cannot execute this script: ${this._sqlText}`);
+				throw new InvalidOperationError(`executeQueryMultiSets: cannot execute this script: ${this._sqlText}`);
 			}
 
 			const resultFetchsValue = helpers.parsingValue(resultFetchs);
@@ -322,23 +330,24 @@ class PostgresSqlStatement implements SqlStatement {
 			helpers.statementArgumentsAdapter(values)
 		);
 
-		const underlyingRows = underlyingResult.rows;
-		const underlyingFields = underlyingResult.fields;
-		if (underlyingRows.length > 0) {
-			if (underlyingFields[0].dataTypeID === DATA_TYPE_ID_MULTI) {
-				throw new InvalidOperationError("executeScalar does not support multiset request yet");
-			}
 
-			const underlyingFirstRow = underlyingRows[0];
-			const value = underlyingFirstRow[Object.keys(underlyingFirstRow)[0]];
-			const fi = underlyingFields[0];
-			if (value !== undefined || fi !== undefined) {
-				return new PostgresData(value, fi);
-			} else {
-				throw new ArgumentError("values", `Bad argument ${value} and ${fi}`);
-			}
+		const underlyingRows = underlyingResult.rows;
+		if (underlyingRows.length === 0) {
+			throw new SqlNoSuchRecordError(`executeScalar: No record for query ${this._sqlText}`);
+		}
+
+		const underlyingFields = underlyingResult.fields;
+		if (underlyingFields[0].dataTypeID === DATA_TYPE_ID_MULTI) {
+			throw new InvalidOperationError("executeScalar: does not support multiset request yet");
+		}
+
+		const underlyingFirstRow = underlyingRows[0];
+		const value = underlyingFirstRow[Object.keys(underlyingFirstRow)[0]];
+		const fi = underlyingFields[0];
+		if (value !== undefined || fi !== undefined) {
+			return new PostgresData(value, fi);
 		} else {
-			throw new Error("Underlying Postgres provider returns not enough data to complete request.");
+			throw new SqlError(`executeScalar: Bad argument ${value} and ${fi}`);
 		}
 	}
 
@@ -354,7 +363,7 @@ class PostgresSqlStatement implements SqlStatement {
 		const underlyingFields = underlyingResult.fields;
 		if (underlyingRows.length > 0) {
 			if (underlyingFields[0].dataTypeID === DATA_TYPE_ID_MULTI) {
-				throw new InvalidOperationError("executeScalarOrNull does not support multiset request yet");
+				throw new InvalidOperationError("executeScalarOrNull: does not support multiset request yet");
 			}
 
 			const underlyingFirstRow = underlyingRows[0];
@@ -363,7 +372,7 @@ class PostgresSqlStatement implements SqlStatement {
 			if (value !== undefined || fi !== undefined) {
 				return new PostgresData(value, fi);
 			} else {
-				throw new Error(`Bad result ${value} and ${fi}`);
+				throw new SqlError(`executeScalarOrNull: Bad argument ${value} and ${fi}`);
 			}
 		} else {
 			return null;
