@@ -62,6 +62,21 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 		}
 
 		this._pool = new pg.Pool(poolConfig);
+		this._pool.on("error", (err: Error, connection: pg.PoolClient) => {
+			/*
+				https://node-postgres.com/api/pool
+				When a client is sitting idly in the pool it can still emit errors
+				because it is connected to a live backend. If the backend goes down
+				or a network partition is encountered all the idle, connected clients
+				in your application will emit an error through the pool's error event emitter.
+				The error listener is passed the error as the first argument and the client
+				upon which the error occurred as the 2nd argument. The client will be
+				automatically terminated and removed from the pool, it is only passed to the
+				error handler in case you want to inspect it.
+			 */
+			this._log.debug(err.message);
+			this._log.trace(err.message, err);
+		});
 	}
 
 	public async create(cancellationToken: CancellationToken): Promise<SqlProvider> {
@@ -424,11 +439,17 @@ class PostgresSqlResultRecord implements SqlResultRecord {
 
 	private getByIndex(index: number): SqlData {
 		const fi: pg.FieldDef = this._fieldsInfo[index];
+		if (fi === undefined) {
+			throw new ArgumentError("index", `PostgresSqlResultRecord does not have field with index '${index}'`);
+		}
 		const value: any = this._fieldsData[fi.name];
 		return new PostgresData(value, fi);
 	}
 	private getByName(name: string): SqlData {
 		const fi = this.nameMap[name];
+		if (fi === undefined) {
+			throw new ArgumentError("name", `PostgresSqlResultRecord does not have field with name '${name}'`);
+		}
 		const value: any = this._fieldsData[fi.name];
 		return new PostgresData(value, fi);
 	}

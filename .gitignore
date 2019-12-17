@@ -20,3 +20,5 @@ src/**/*.map
 test/**/*.d.ts
 test/**/*.js
 test/**/*.map
+
+.env
