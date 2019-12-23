@@ -629,6 +629,26 @@ class PostgresData implements SqlData {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
 		}
 	}
+	public get asObject(): any {
+		if (this._postgresValue === null) {
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+		} else if (this._fi.dataTypeID === 3802) {
+			// https://github.com/postgres/postgres/blob/2e4db241bfd3206bad8286f8ffc2db6bbdaefcdf/src/include/catalog/pg_type.dat#L438
+			return this._postgresValue;
+		} else {
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+		}
+	}
+	public get asNullableObject(): any | null {
+		if (this._postgresValue === null) {
+			return null;
+		} else if (this._fi.dataTypeID === 3802) {
+			// https://github.com/postgres/postgres/blob/2e4db241bfd3206bad8286f8ffc2db6bbdaefcdf/src/include/catalog/pg_type.dat#L438
+			return this._postgresValue;
+		} else {
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+		}
+	}
 
 	public constructor(postgresValue: any, fi: pg.FieldDef) {
 		if (postgresValue === undefined) {

@@ -31,6 +31,20 @@ CREATE TABLE "tb_dates_test" (
 );
 INSERT INTO "tb_dates_test"("ts","tstz") VALUES ('2016-06-22 19:00:00.410', '2016-06-22 19:00:00.410');
 
+-- DROP TABLE IF EXISTS "tb_jsonb_test";
+CREATE TABLE "tb_jsonb_test" (
+	"id"         SERIAL,
+	"data"       JSONB NULL,
+	PRIMARY KEY ("id")
+);
+INSERT INTO "tb_jsonb_test"("data") VALUES ('"test"');
+INSERT INTO "tb_jsonb_test"("data") VALUES ('42');
+INSERT INTO "tb_jsonb_test"("data") VALUES ('true');
+INSERT INTO "tb_jsonb_test"("data") VALUES ('false');
+INSERT INTO "tb_jsonb_test"("data") VALUES ('[1,2,3]');
+INSERT INTO "tb_jsonb_test"("data") VALUES ('{"a":42}');
+INSERT INTO "tb_jsonb_test"("data") VALUES (NULL);
+
 
 -- DROP FUNCTION IF EXISTS sp_contains;
 CREATE FUNCTION sp_contains("value" VARCHAR(128))

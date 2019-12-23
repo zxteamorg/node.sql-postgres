@@ -76,7 +76,7 @@ function getOpts(): PostgresProviderFactory.Opts {
 }
 
 
-describe("PostgreSQL Tests 1", function () {
+describe("PostgreSQL Tests", function () {
 	let sqlProviderFactory: PostgresProviderFactory;
 	let sqlProvider: SqlProvider | null = null;
 
@@ -177,6 +177,73 @@ describe("PostgreSQL Tests 1", function () {
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asNullableBoolean, null);
 	});
+	it("Read true from JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 1")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.equal(result.asString, "test");
+	});
+	it("Read true from JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 2")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.equal(result.asInteger, 42);
+	});
+	it("Read true from JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 3")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.equal(result.asBoolean, true);
+	});
+	it("Read false from JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 4")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.equal(result.asBoolean, false);
+	});
+	it("Read JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 1")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.equal(result.asObject, "test");
+	});
+	it("Read JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 2")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.equal(result.asObject, 42);
+	});
+	it("Read JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 3")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.equal(result.asObject, true);
+	});
+	it("Read JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 4")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.equal(result.asObject, false);
+	});
+	it("Read JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 5")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.deepEqual(result.asObject, [1, 2, 3]);
+	});
+	it("Read JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 6")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.deepEqual(result.asObject, { "a": 42 });
+	});
+	it("Read JSONB through executeScalar", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT data FROM tb_jsonb_test WHERE id = 7")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN);
+		assert.deepEqual(result.asNullableObject, null);
+	});
+
 
 	it("Read \"Hello, world!!!\" as string through executeScalar", async function () {
 		const result = await getSqlProvider()
