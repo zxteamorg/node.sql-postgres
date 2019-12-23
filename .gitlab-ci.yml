@@ -8,7 +8,7 @@ test:
   stage: test
   image: docker.registry.zxteam.net/pub/docker/build/node10.protoc-mysqlcli-psqlcli:1
   dependencies:
-    - build
+    - compile
   variables:
     GIT_STRATEGY: none
     TEST_DB_URL: 'postgres://devtest@postgres:5432/emptytestdb'
