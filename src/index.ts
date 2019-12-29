@@ -19,6 +19,8 @@ import * as pg from "pg";
 const DATA_TYPE_ID_EMPTY = 2278; // Return postgres if data is null
 const DATA_TYPE_ID_MULTI = 1790; // Return postgres if data is multy
 
+export { PostgresMigrationManager } from "./PostgresMigrationManager";
+
 export class PostgresProviderFactory extends Initable implements SqlProviderFactory {
 	private readonly _log: Logger;
 	private readonly _url: URL;
@@ -36,6 +38,10 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 		if (!_.isEmpty(this._url.port)) { poolConfig.port = Number.parseInt(this._url.port); }
 		if (!_.isEmpty(this._url.username)) { poolConfig.user = this._url.username; }
 		if (!_.isEmpty(this._url.password)) { poolConfig.password = this._url.password; }
+
+		if (this._url.protocol !== "postgres:") {
+			throw new ArgumentError("opts.url", "Expected URL schema 'postgres:'");
+		}
 
 		// DB name
 		let pathname = this._url.pathname;
