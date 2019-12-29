@@ -4,6 +4,7 @@ import ensureFactory from "@zxteam/ensure";
 import { SqlProvider, SqlSyntaxError, SqlConstraintError, SqlError } from "@zxteam/sql";
 
 import * as chai from "chai";
+import { PendingSuiteFunction, Suite, SuiteFunction } from "mocha";
 
 import { PostgresProviderFactory } from "../src";
 
@@ -34,7 +35,44 @@ chai.use(function (c, u) {
 
 const { assert } = chai;
 
-const ensureTestDbUrl = ensureFactory((message, data) => { throw new Error(`Unexpected value of TEST_DB_URL. ${message}`); });
+
+const { myDescribe, TEST_DB_URL } = (function (): {
+	myDescribe: PendingSuiteFunction | SuiteFunction;
+	TEST_DB_URL: string | null
+} {
+	let { TEST_DB_URL: testDbUrl } = process.env;
+
+	if (!testDbUrl) {
+		console.warn(`The tests ${__filename} are skipped due TEST_DB_URL is not set`);
+		return { myDescribe: describe.skip, TEST_DB_URL: null };
+	}
+
+	switch (testDbUrl) {
+		case "postgres://": {
+			const host = "localhost";
+			const port = 5432;
+			const user = "postgres";
+			testDbUrl = `postgres://${user}@${host}:${port}/emptytestdb`;
+			return { myDescribe: describe, TEST_DB_URL: testDbUrl };
+		}
+	}
+
+	let url: URL;
+	try { url = new URL(testDbUrl); } catch (e) {
+		console.warn(`The tests ${__filename} are skipped due TEST_DB_URL has wrong value. Expected URL like postgres://testuser:testpwd@127.0.0.1:5432/db`);
+		return { myDescribe: describe.skip, TEST_DB_URL: testDbUrl };
+	}
+
+	switch (url.protocol) {
+		case "postgres:": {
+			return { myDescribe: describe, TEST_DB_URL: testDbUrl };
+		}
+		default: {
+			console.warn(`The tests ${__filename} are skipped due TEST_DB_URL has wrong value. Unsupported protocol: ${url.protocol}`);
+			return { myDescribe: describe.skip, TEST_DB_URL: testDbUrl };
+		}
+	}
+})();
 
 const DUMMY_CANCELLATION_TOKEN: CancellationToken = {
 	get isCancellationRequested(): boolean { return false; },
@@ -43,40 +81,7 @@ const DUMMY_CANCELLATION_TOKEN: CancellationToken = {
 	throwIfCancellationRequested(): void { /* STUB */ }
 };
 
-function getOpts(): PostgresProviderFactory.Opts {
-	function parseDbServerUrl(url: string): URL {
-		try {
-			return new URL(url);
-		} catch (e) {
-			throw new Error(`Wrong TEST_DB_URL = ${url}. ${e.message}.`);
-		}
-	}
-
-	if ("TEST_DB_URL" in process.env) {
-		const urlStr = ensureTestDbUrl.string(process.env.TEST_DB_URL as string);
-		switch (urlStr) {
-			case "postgres://": {
-				const host = "localhost";
-				const port = 5432;
-				const user = "devtest";
-				const postgresUrl = new URL(`postgres://${user}@${host}:${port}/emptytestdb`);
-				return { url: postgresUrl };
-			}
-		}
-
-		const url = parseDbServerUrl(urlStr);
-		switch (url.protocol) {
-			case "postgres:": return { url };
-			default:
-				throw new Error(`Not supported DB Server protocol = ${process.env.TEST_DB_URL}`);
-		}
-	} else {
-		throw new Error("TEST_DB_URL environment is not defined. Please set the variable to use these tests.");
-	}
-}
-
-
-describe("PostgreSQL Tests", function () {
+myDescribe("PostgreSQL Tests", function () {
 	let sqlProviderFactory: PostgresProviderFactory;
 	let sqlProvider: SqlProvider | null = null;
 
@@ -100,7 +105,7 @@ describe("PostgreSQL Tests", function () {
 		});
 		*/
 
-		sqlProviderFactory = new PostgresProviderFactory(getOpts());
+		sqlProviderFactory = new PostgresProviderFactory({ url: new URL(TEST_DB_URL!) });
 	});
 	after(async function () {
 		if (sqlProviderFactory) {
@@ -620,7 +625,7 @@ describe("PostgreSQL Tests", function () {
 });
 
 
-describe("PostgreSQL Tests via usingProvider", function () {
+myDescribe("PostgreSQL Tests via usingProvider", function () {
 	let sqlProviderFactory: PostgresProviderFactory;
 
 	before(async function () {
@@ -638,7 +643,7 @@ describe("PostgreSQL Tests via usingProvider", function () {
 		});
 		*/
 
-		sqlProviderFactory = new PostgresProviderFactory(getOpts());
+		sqlProviderFactory = new PostgresProviderFactory({ url: new URL(TEST_DB_URL!) });
 	});
 	after(async function () {
 		if (sqlProviderFactory) {
@@ -658,7 +663,7 @@ describe("PostgreSQL Tests via usingProvider", function () {
 });
 
 
-describe("PostgreSQL Tests via usingProviderWithTransaction", function () {
+myDescribe("PostgreSQL Tests via usingProviderWithTransaction", function () {
 	let sqlProviderFactory: PostgresProviderFactory;
 
 	before(async function () {
@@ -676,7 +681,7 @@ describe("PostgreSQL Tests via usingProviderWithTransaction", function () {
 		});
 		*/
 
-		sqlProviderFactory = new PostgresProviderFactory(getOpts());
+		sqlProviderFactory = new PostgresProviderFactory({ url: new URL(TEST_DB_URL!) });
 	});
 	after(async function () {
 		if (sqlProviderFactory) {

@@ -27,6 +27,31 @@
 			"sourceMaps": true
 		},
 		{
+			"name": "Tests Migration",
+			"type": "node",
+			"request": "launch",
+			"preLaunchTask": "compile:test:ts",
+			"runtimeExecutable": null,
+			"runtimeArgs": [
+				"--nolazy",
+				"--require",
+				"source-map-support/register"
+			],
+			"stopOnEntry": false,
+			"program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
+			"args": [
+				"--no-timeouts",
+				"--colors",
+				"--debug-brk",
+				"test/**/*.test.js"
+			],
+			"env": {
+				"NODE_ENV": "development",
+				"TEST_MIGRATION_DB_URL": "postgres://"
+			},
+			"sourceMaps": true
+		},
+		{
 			"name": "broken-connection.longrun",
 			"type": "node",
 			"runtimeArgs": [
