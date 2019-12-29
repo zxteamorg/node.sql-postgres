@@ -737,7 +737,7 @@ namespace helpers {
 					case "40002":
 					case "42000":
 					case "44000":
-						throw new SqlConstraintError(`SQL Constrain restriction happened: ${err.message}`, "???", err);
+						throw new SqlConstraintError(`SQL Constraint restriction happened: ${err.message}`, "???", err);
 					case "42000":
 					case "42601":
 						throw new SqlSyntaxError(`Looks like wrong SQL syntax detected: ${err.message}. See innerError for details.`, err);
