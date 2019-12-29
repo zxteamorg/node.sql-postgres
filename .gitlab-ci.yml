@@ -18,3 +18,17 @@ test-unit:
   script:
     - npm run prepare:devdb
     - npm run test
+
+test-migration:
+  stage: test
+  image: docker.registry.zxteam.net/pub/docker/build/node10.protoc-mysqlcli-psqlcli:1
+  dependencies:
+    - compile
+  variables:
+    GIT_STRATEGY: none
+    TEST_MIGRATION_DB_URL: 'postgres://postgres@postgres:5432/emptytestdb'
+  services:
+    - name: docker.registry.zxteam.net/pub/docker/test/postgres10:1
+      alias: postgres
+  script:
+    - npm run test
