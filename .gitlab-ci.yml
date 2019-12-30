@@ -11,8 +11,7 @@ test-unit:
     - compile
   variables:
     GIT_STRATEGY: none
-    TEST_DB_URL: 'postgres://devtest@postgres:5432/emptytestdb'
-    TEST_MIGRATION_DB_URL: 'postgres://postgres@postgres:5432/emptytestdb'
+    TEST_DB_URL: 'postgres://postgres:@postgres:5432/emptytestdb'
   services:
     - name: docker.registry.zxteam.net/pub/docker/test/postgres10:1
       alias: postgres

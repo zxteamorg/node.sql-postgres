@@ -56,8 +56,8 @@
 	"homepage": "https://github.com/zxteamorg/node-postgres.sql",
 	"scripts": {
 		"build": "zxbuild clean dist && cp README.md .dist/",
-		"test:local": "env TEST_DB_URL=\"postgres://\" mocha --require source-map-support/register --recursive \"test/**/*.test.js\"",
-		"test": "nyc --exclude submodules --exclude test --extension=\".ts\" --reporter=lcov --reporter=text --reporter=text-summary mocha --require source-map-support/register --recursive \"test/**/*.test.js\""
+		"test:local": "env TEST_DB_URL=\"postgres://\" mocha --require source-map-support/register --timeout 20000 --recursive \"test/**/*.test.js\"",
+		"test": "nyc --exclude submodules --exclude test --extension=\".ts\" --reporter=lcov --reporter=text --reporter=text-summary mocha --require source-map-support/register --timeout 20000 --recursive \"test/**/*.test.js\""
 	},
 	"private": true
 }

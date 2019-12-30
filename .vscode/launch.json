@@ -15,15 +15,14 @@
 			"stopOnEntry": false,
 			"program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
 			"args": [
-				"--no-timeouts",
+				"--no-timeout",
 				"--colors",
 				"--debug-brk",
 				"test/**/*.test.js"
 			],
 			"env": {
 				"NODE_ENV": "development",
-				"TEST_DB_URL": "postgres://",
-				"TEST_MIGRATION_DB_URL": "postgres://"
+				"TEST_DB_URL": "postgres://"
 			},
 			"sourceMaps": true
 		},
