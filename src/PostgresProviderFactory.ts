@@ -52,7 +52,15 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 		if (opts.connectionTimeoutMillis !== undefined) { poolConfig.idleTimeoutMillis = opts.idleTimeoutMillis; }
 
 		// App name
-		if (!_.isEmpty(opts.applicationName)) { poolConfig.application_name = opts.applicationName; }
+
+		if (!_.isEmpty(opts.applicationName)) {
+			poolConfig.application_name = opts.applicationName;
+		} else {
+			const appNameFromUrl: string | null = this._url.searchParams.get("app");
+			if (appNameFromUrl !== null && !_.isEmpty(appNameFromUrl)) {
+				poolConfig.application_name = appNameFromUrl;
+			}
+		}
 
 		// SSL
 		if (opts.ssl !== undefined) {
@@ -83,7 +91,11 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 			this._log.trace(err.message, err);
 		});
 
-		this._defaultSchema = opts.defaultSchema !== undefined ? opts.defaultSchema : "public";
+		const schemaFromUrl: string | null = this._url.searchParams.get("schema");
+		this._defaultSchema = opts.defaultSchema !== undefined ?
+			opts.defaultSchema :
+			schemaFromUrl !== null ?
+				schemaFromUrl : "public";
 	}
 
 	public get defaultSchema(): string { return this._defaultSchema; }
@@ -188,11 +200,15 @@ export namespace PostgresProviderFactory {
 	export interface Opts {
 		readonly url: URL;
 		/**
-		 * Default schema
+		 * Default schema. The value overrides an URL param "schema".
 		 * @description Each pgClient will execute SQL statement: `SET search_path TO ${defaultSchema}` before wrapping in `PostgresSqlProvider`
 		 * @default "public"
 		 */
 		readonly defaultSchema?: string;
+		/**
+		 * Application name. Used by Postres in monitoring stuff.
+		 * The value ovverides an URL param "app"
+		 */
 		readonly applicationName?: string;
 		readonly log?: Logger;
 		readonly connectionTimeoutMillis?: number;
