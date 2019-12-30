@@ -1,12 +1,15 @@
 import { CancellationToken, Financial } from "@zxteam/contract";
+import { DUMMY_CANCELLATION_TOKEN } from "@zxteam/cancellation";
+import { logger } from "@zxteam/logger";
 import financial from "@zxteam/financial";
 import ensureFactory from "@zxteam/ensure";
 import { SqlProvider, SqlSyntaxError, SqlConstraintError, SqlError } from "@zxteam/sql";
 
 import * as chai from "chai";
 import { PendingSuiteFunction, Suite, SuiteFunction } from "mocha";
+import * as path from "path";
 
-import { PostgresProviderFactory } from "../src";
+import { PostgresProviderFactory, PostgresMigrationManager } from "../src";
 
 declare global {
 	namespace Chai {
@@ -74,14 +77,9 @@ const { myDescribe, TEST_DB_URL } = (function (): {
 	}
 })();
 
-const DUMMY_CANCELLATION_TOKEN: CancellationToken = {
-	get isCancellationRequested(): boolean { return false; },
-	addCancelListener(cb: Function): void { /* STUB */ },
-	removeCancelListener(cb: Function): void { /* STUB */ },
-	throwIfCancellationRequested(): void { /* STUB */ }
-};
+const timestamp = Date.now();
 
-myDescribe("PostgreSQL Tests", function () {
+myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () {
 	let sqlProviderFactory: PostgresProviderFactory;
 	let sqlProvider: SqlProvider | null = null;
 
@@ -91,21 +89,29 @@ myDescribe("PostgreSQL Tests", function () {
 	}
 
 	before(async function () {
-		// runs before all tests in this block
+		const log = logger.getLogger(`general_test_1_${timestamp}`);
 
-		// Uncomment rows below to enable trace log
-		/*
-		configure({
-			appenders: {
-				out: { type: "console" }
-			},
-			categories: {
-				default: { appenders: ["out"], level: "trace" }
-			}
+		sqlProviderFactory = new PostgresProviderFactory({
+			url: new URL(TEST_DB_URL!), defaultSchema: `general_test_1_${timestamp}`, log
 		});
-		*/
+		await sqlProviderFactory.init(DUMMY_CANCELLATION_TOKEN);
+		try {
+			const manager = new PostgresMigrationManager({
+				migrationFilesRootPath: path.normalize(path.join(__dirname, "..", "test.files", "general")),
+				sqlProviderFactory, log
+			});
 
-		sqlProviderFactory = new PostgresProviderFactory({ url: new URL(TEST_DB_URL!) });
+			await manager.init(DUMMY_CANCELLATION_TOKEN);
+			try {
+				await manager.migrate(DUMMY_CANCELLATION_TOKEN);
+			} finally {
+				await manager.dispose();
+			}
+
+		} catch (e) {
+			await sqlProviderFactory.dispose();
+			throw e;
+		}
 	});
 	after(async function () {
 		if (sqlProviderFactory) {
@@ -625,25 +631,33 @@ myDescribe("PostgreSQL Tests", function () {
 });
 
 
-myDescribe("PostgreSQL Tests via usingProvider", function () {
+myDescribe(`PostgreSQL Tests via usingProvider (schema:general_test_2_${timestamp})`, function () {
 	let sqlProviderFactory: PostgresProviderFactory;
 
 	before(async function () {
-		// runs before all tests in this block
+		const log = logger.getLogger(`general_test_2_${timestamp}`);
 
-		// Uncomment rows below to enable trace log
-		/*
-		configure({
-			appenders: {
-				out: { type: "console" }
-			},
-			categories: {
-				default: { appenders: ["out"], level: "trace" }
-			}
+		sqlProviderFactory = new PostgresProviderFactory({
+			url: new URL(TEST_DB_URL!), defaultSchema: `general_test_2_${timestamp}`, log
 		});
-		*/
+		await sqlProviderFactory.init(DUMMY_CANCELLATION_TOKEN);
+		try {
+			const manager = new PostgresMigrationManager({
+				migrationFilesRootPath: path.normalize(path.join(__dirname, "..", "test.files", "general")),
+				sqlProviderFactory, log
+			});
 
-		sqlProviderFactory = new PostgresProviderFactory({ url: new URL(TEST_DB_URL!) });
+			await manager.init(DUMMY_CANCELLATION_TOKEN);
+			try {
+				await manager.migrate(DUMMY_CANCELLATION_TOKEN);
+			} finally {
+				await manager.dispose();
+			}
+
+		} catch (e) {
+			await sqlProviderFactory.dispose();
+			throw e;
+		}
 	});
 	after(async function () {
 		if (sqlProviderFactory) {
@@ -663,25 +677,33 @@ myDescribe("PostgreSQL Tests via usingProvider", function () {
 });
 
 
-myDescribe("PostgreSQL Tests via usingProviderWithTransaction", function () {
+myDescribe(`PostgreSQL Tests via usingProviderWithTransaction (schema:general_test_3_${timestamp})`, function () {
 	let sqlProviderFactory: PostgresProviderFactory;
 
 	before(async function () {
-		// runs before all tests in this block
+		const log = logger.getLogger(`general_test_3_${timestamp}`);
 
-		// Uncomment rows below to enable trace log
-		/*
-		configure({
-			appenders: {
-				out: { type: "console" }
-			},
-			categories: {
-				default: { appenders: ["out"], level: "trace" }
-			}
+		sqlProviderFactory = new PostgresProviderFactory({
+			url: new URL(TEST_DB_URL!), defaultSchema: `general_test_3_${timestamp}`, log
 		});
-		*/
+		await sqlProviderFactory.init(DUMMY_CANCELLATION_TOKEN);
+		try {
+			const manager = new PostgresMigrationManager({
+				migrationFilesRootPath: path.normalize(path.join(__dirname, "..", "test.files", "general")),
+				sqlProviderFactory, log
+			});
 
-		sqlProviderFactory = new PostgresProviderFactory({ url: new URL(TEST_DB_URL!) });
+			await manager.init(DUMMY_CANCELLATION_TOKEN);
+			try {
+				await manager.migrate(DUMMY_CANCELLATION_TOKEN);
+			} finally {
+				await manager.dispose();
+			}
+
+		} catch (e) {
+			await sqlProviderFactory.dispose();
+			throw e;
+		}
 	});
 	after(async function () {
 		if (sqlProviderFactory) {

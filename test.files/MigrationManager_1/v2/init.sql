@@ -7,3 +7,9 @@ CREATE TABLE "subscriber"
 	"utc_delete_date" TIMESTAMP WITHOUT TIME ZONE NULL,
 	CONSTRAINT "uq__subscriber__subscriber_uuid" UNIQUE ("subscriber_uuid")
 );
+
+CREATE VIEW "topic_view" AS
+	SELECT * FROM "topic";
+
+CREATE VIEW "subscriber_view" AS
+	SELECT * FROM "subscriber";

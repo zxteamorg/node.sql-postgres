@@ -1,6 +1,6 @@
 {
 	"name": "@zxteam/sql-postgres",
-	"version": "6.0.46",
+	"version": "6.0.47",
 	"description": "ZXTeam's SQL implementation for PostgreSQL",
 	"main": "./src/index.js",
 	"types": "./src/index.d.ts",
@@ -57,8 +57,7 @@
 	"scripts": {
 		"build": "zxbuild clean dist && cp README.md .dist/",
 		"test:local": "env TEST_DB_URL=\"postgres://\" mocha --require source-map-support/register --recursive \"test/**/*.test.js\"",
-		"test": "nyc --exclude submodules --exclude test --extension=\".ts\" --reporter=lcov --reporter=text --reporter=text-summary mocha --require source-map-support/register --recursive \"test/**/*.test.js\"",
-		"prepare:devdb": "scripts/init-test-db.sh"
+		"test": "nyc --exclude submodules --exclude test --extension=\".ts\" --reporter=lcov --reporter=text --reporter=text-summary mocha --require source-map-support/register --recursive \"test/**/*.test.js\""
 	},
 	"private": true
 }

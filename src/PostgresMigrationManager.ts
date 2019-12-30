@@ -1,7 +1,15 @@
 import { MigrationManager, SqlProvider } from "@zxteam/sql";
 import { CancellationToken } from "@zxteam/contract";
 
+import { PostgresProviderFactory } from "./PostgresProviderFactory";
+
 export class PostgresMigrationManager extends MigrationManager {
+	private readonly _schema: string;
+
+	public constructor(opts: PostgresMigrationManager.Opts) {
+		super(opts);
+		this._schema = opts.sqlProviderFactory.defaultSchema;
+	}
 
 	public getCurrentVersion(cancellationToken: CancellationToken): Promise<string | null> {
 		return this.sqlProviderFactory.usingProvider(cancellationToken, async (sqlProvider: SqlProvider) => {
@@ -25,8 +33,8 @@ export class PostgresMigrationManager extends MigrationManager {
 
 	protected async _isVersionTableExist(cancellationToken: CancellationToken, sqlProvider: SqlProvider): Promise<boolean> {
 		const isExistSqlData = await sqlProvider.statement(
-			"SELECT 1 FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema' AND tablename = $1"
-		).executeScalarOrNull(cancellationToken, this.versionTableName);
+			`SELECT 1 FROM "pg_catalog"."pg_tables" WHERE "schemaname" != 'pg_catalog' AND "schemaname" != 'information_schema' AND "schemaname" = $1 AND "tablename" = $2`
+		).executeScalarOrNull(cancellationToken, this._schema, this.versionTableName);
 
 		if (isExistSqlData === null) { return false; }
 		if (isExistSqlData.asInteger !== 1) { throw new PostgresMigrationManager.MigrationError("Unexpected SQL result"); }
@@ -44,18 +52,22 @@ export class PostgresMigrationManager extends MigrationManager {
 	}
 
 	protected async _createVersionTable(cancellationToken: CancellationToken, sqlProvider: SqlProvider): Promise<void> {
-		const tableCountData = await sqlProvider.statement(
-			"SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema' AND tablename != 'emptytestflag'"
-		).executeScalar(cancellationToken);
-		if (tableCountData.asString !== "0") { // asString because BigInt
-			throw new PostgresMigrationManager.MigrationError("Your database has tables. Create Version Table allowed only for an empty database. Please create Version Table yourself.");
+		await sqlProvider.statement(`CREATE SCHEMA IF NOT EXISTS "${this._schema}"`).execute(cancellationToken);
+
+		const tables = await sqlProvider.statement(
+			`SELECT "tablename" FROM "pg_catalog"."pg_tables" WHERE "schemaname" != 'pg_catalog' AND "schemaname" != 'information_schema' AND "schemaname" = $1 AND "tablename" != 'emptytestflag'`
+		).executeQuery(cancellationToken, this._schema);
+		if (tables.length > 0) {
+			const tablesString = tables.slice(0, 5).map(sqlData => sqlData.get(0).asString).join(", ") + "..";
+			throw new PostgresMigrationManager.MigrationError(`Your database has tables: ${tablesString}. Create Version Table allowed only for an empty database. Please create Version Table yourself.`);
 		}
 
-		const viewsCountData = await sqlProvider.statement(
-			"SELECT COUNT(*) FROM pg_catalog.pg_views WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema'"
-		).executeScalar(cancellationToken);
-		if (viewsCountData.asString !== "0") { // asString because BigInt
-			throw new PostgresMigrationManager.MigrationError("Your database has views. Create Version Table allowed only for an empty database. Please create Version Table yourself.");
+		const views = await sqlProvider.statement(
+			`SELECT "viewname" FROM "pg_catalog"."pg_views" WHERE "schemaname" != 'pg_catalog' AND "schemaname" != 'information_schema' AND "schemaname" = $1`
+		).executeQuery(cancellationToken, this._schema);
+		if (views.length > 0) {
+			const viewsString = views.slice(0, 5).map(sqlData => sqlData.get(0).asString).join(", ") + "..";
+			throw new PostgresMigrationManager.MigrationError(`Your database has views: ${viewsString}. Create Version Table allowed only for an empty database. Please create Version Table yourself.`);
 		}
 
 		await sqlProvider.statement(
@@ -73,5 +85,11 @@ export class PostgresMigrationManager extends MigrationManager {
 		await sqlProvider.statement(
 			`INSERT INTO "${this.versionTableName}"("version", "log") VALUES($1, $2)`
 		).execute(cancellationToken, version, logText);
+	}
+}
+
+export namespace PostgresMigrationManager {
+	export interface Opts extends MigrationManager.Opts {
+		readonly sqlProviderFactory: PostgresProviderFactory;
 	}
 }
