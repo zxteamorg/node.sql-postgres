@@ -31,26 +31,6 @@ export class PostgresMigrationManager extends MigrationManager {
 		});
 	}
 
-	protected async _isVersionTableExist(cancellationToken: CancellationToken, sqlProvider: SqlProvider): Promise<boolean> {
-		const isExistSqlData = await sqlProvider.statement(
-			`SELECT 1 FROM "pg_catalog"."pg_tables" WHERE "schemaname" != 'pg_catalog' AND "schemaname" != 'information_schema' AND "schemaname" = $1 AND "tablename" = $2`
-		).executeScalarOrNull(cancellationToken, this._schema, this.versionTableName);
-
-		if (isExistSqlData === null) { return false; }
-		if (isExistSqlData.asInteger !== 1) { throw new PostgresMigrationManager.MigrationError("Unexpected SQL result"); }
-
-		return true;
-	}
-
-	protected async _verifyVersionTableStructure(cancellationToken: CancellationToken, sqlProvider: SqlProvider): Promise<void> {
-		const isExist = await this._isVersionTableExist(cancellationToken, sqlProvider);
-		if (isExist === false) { throw new PostgresMigrationManager.MigrationError(`The database does not have version table: ${this.versionTableName}`); }
-
-		// TODO check columns
-		// It is hard to check without schema name
-		// SELECT * FROM information_schema.columns WHERE table_schema = '????' AND table_name = '${this.versionTableName}'
-	}
-
 	protected async _createVersionTable(cancellationToken: CancellationToken, sqlProvider: SqlProvider): Promise<void> {
 		await sqlProvider.statement(`CREATE SCHEMA IF NOT EXISTS "${this._schema}"`).execute(cancellationToken);
 
@@ -79,12 +59,32 @@ export class PostgresMigrationManager extends MigrationManager {
 		).execute(cancellationToken);
 	}
 
+	protected async _isVersionTableExist(cancellationToken: CancellationToken, sqlProvider: SqlProvider): Promise<boolean> {
+		const isExistSqlData = await sqlProvider.statement(
+			`SELECT 1 FROM "pg_catalog"."pg_tables" WHERE "schemaname" != 'pg_catalog' AND "schemaname" != 'information_schema' AND "schemaname" = $1 AND "tablename" = $2`
+		).executeScalarOrNull(cancellationToken, this._schema, this.versionTableName);
+
+		if (isExistSqlData === null) { return false; }
+		if (isExistSqlData.asInteger !== 1) { throw new PostgresMigrationManager.MigrationError("Unexpected SQL result"); }
+
+		return true;
+	}
+
 	protected async _insertVersionLog(
 		cancellationToken: CancellationToken, sqlProvider: SqlProvider, version: string, logText: string
 	): Promise<void> {
 		await sqlProvider.statement(
 			`INSERT INTO "${this.versionTableName}"("version", "log") VALUES($1, $2)`
 		).execute(cancellationToken, version, logText);
+	}
+
+	protected async _verifyVersionTableStructure(cancellationToken: CancellationToken, sqlProvider: SqlProvider): Promise<void> {
+		const isExist = await this._isVersionTableExist(cancellationToken, sqlProvider);
+		if (isExist === false) { throw new PostgresMigrationManager.MigrationError(`The database does not have version table: ${this.versionTableName}`); }
+
+		// TODO check columns
+		// It is hard to check without schema name
+		// SELECT * FROM information_schema.columns WHERE table_schema = '????' AND table_name = '${this.versionTableName}'
 	}
 }
 
