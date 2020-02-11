@@ -1,7 +1,7 @@
 import { CancellationToken, Financial } from "@zxteam/contract";
 import { DUMMY_CANCELLATION_TOKEN } from "@zxteam/cancellation";
 import { logger } from "@zxteam/logger";
-import financial from "@zxteam/financial";
+import { FinancialOperation, Settings as FinancialSettings, setup as financialSetup } from "@zxteam/financial";
 import ensureFactory from "@zxteam/ensure";
 import { SqlProvider, SqlSyntaxError, SqlConstraintError, SqlError } from "@zxteam/sql";
 
@@ -79,6 +79,15 @@ const { myDescribe, TEST_DB_URL } = (function (): {
 
 const timestamp = Date.now();
 
+
+const financial: FinancialOperation = financialSetup(FinancialSettings.Backend.bignumberjs, {
+	decimalSeparator: ".",
+	defaultRoundOpts: {
+		fractionalDigits: 22,
+		roundMode: Financial.RoundMode.Ceil
+	}
+});
+
 myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () {
 	let sqlProviderFactory: PostgresProviderFactory;
 	let sqlProvider: SqlProvider | null = null;
@@ -92,7 +101,8 @@ myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () 
 		const log = logger.getLogger(`general_test_1_${timestamp}`);
 
 		sqlProviderFactory = new PostgresProviderFactory({
-			url: new URL(TEST_DB_URL!), defaultSchema: `general_test_1_${timestamp}`, log
+			url: new URL(TEST_DB_URL!), defaultSchema: `general_test_1_${timestamp}`, log,
+			financialOperation: financial
 		});
 		await sqlProviderFactory.init(DUMMY_CANCELLATION_TOKEN);
 		try {
@@ -187,6 +197,23 @@ myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () 
 			.statement("SELECT NULL AS c0, 1 AS c1 UNION ALL SELECT 1, 1")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asNullableBoolean, null);
+	});
+	it.only("Read financial through executeSingle", async function () {
+		const result = await getSqlProvider()
+			.statement('SELECT "varchar","int","decimal" FROM tb_financial WHERE "id" = 1')
+			.executeSingle(DUMMY_CANCELLATION_TOKEN);
+		assert.equal(result.get("varchar").asString, "42.42");
+		assert.equal(result.get("int").asInteger, 42);
+		const float = result.get("decimal").asNumber;
+		assert.equal(float, 424242424242424242424242.424242424242424242421111);
+
+		assert.equal(result.get("varchar").asFinancial.toString(), "42.42");
+		assert.equal(result.get("int").asFinancial.toString(), "42");
+		assert.equal(
+			result.get("decimal").asFinancial.toString(),
+			"424242424242424242424242.4242424242424242424212", // ceil rounding
+			"Should ceil 2 precision digits according setting fractionalDigits: 22"
+		);
 	});
 	it("Read true from JSONB through executeScalar", async function () {
 		const result = await getSqlProvider()

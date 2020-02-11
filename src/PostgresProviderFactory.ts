@@ -5,7 +5,7 @@ import {
 	ArgumentError, CancelledError, InvalidOperationError,
 	wrapErrorIfNeeded, AggregateError
 } from "@zxteam/errors";
-import { financial } from "@zxteam/financial";
+import { FinancialOperation, financial } from "@zxteam/financial";
 import {
 	SqlProviderFactory, SqlProvider, SqlStatement,
 	SqlStatementParam, SqlResultRecord, SqlData,
@@ -16,10 +16,12 @@ import {
 import * as _ from "lodash";
 import * as pg from "pg";
 
-const DATA_TYPE_ID_EMPTY = 2278; // Return postgres if data is null
+const DATA_TYPE_ID_NUMERIC = 1700;
 const DATA_TYPE_ID_MULTI = 1790; // Return postgres if data is multy
+const DATA_TYPE_ID_EMPTY = 2278; // Return postgres if data is null
 
 export class PostgresProviderFactory extends Initable implements SqlProviderFactory {
+	private readonly _financialOperation: FinancialOperation;
 	private readonly _log: Logger;
 	private readonly _url: URL;
 	private readonly _pool: pg.Pool;
@@ -31,6 +33,8 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 		this._url = opts.url;
 		this._log = opts.log !== undefined ? opts.log : DUMMY_LOGGER;
 		this._log.trace("PostgresProviderPoolFactory constructed");
+
+		this._financialOperation = opts.financialOperation !== undefined ? opts.financialOperation : financial;
 
 		const poolConfig: pg.PoolConfig = { host: this._url.hostname };
 
@@ -117,6 +121,7 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 					// dispose callback
 					pgClient.release();
 				},
+				this._financialOperation,
 				this._log
 			);
 
@@ -213,6 +218,7 @@ export namespace PostgresProviderFactory {
 		readonly log?: Logger;
 		readonly connectionTimeoutMillis?: number;
 		readonly idleTimeoutMillis?: number;
+		readonly financialOperation?: FinancialOperation;
 		readonly ssl?: {
 			readonly caCert?: Buffer;
 			readonly clientCert?: {
@@ -224,14 +230,16 @@ export namespace PostgresProviderFactory {
 }
 
 class PostgresSqlProvider extends Disposable implements SqlProvider {
+	public readonly financialOperation: FinancialOperation;
 	public readonly dialect: SqlDialect = SqlDialect.PostgreSQL;
 	public readonly pgClient: pg.PoolClient;
 	public readonly log: Logger;
 	private readonly _disposer: () => Promise<void>;
-	public constructor(pgClient: pg.PoolClient, disposer: () => Promise<void>, log: Logger) {
+	public constructor(pgClient: pg.PoolClient, disposer: () => Promise<void>, financialOperation: FinancialOperation, log: Logger) {
 		super();
 		this.pgClient = pgClient;
 		this._disposer = disposer;
+		this.financialOperation = financialOperation;
 		this.log = log;
 		this.log.trace("PostgresSqlProvider constructed");
 	}
@@ -270,7 +278,7 @@ class PostgresSqlStatement implements SqlStatement {
 			cancellationToken,
 			this._owner.pgClient,
 			this._sqlText,
-			helpers.statementArgumentsAdapter(values)
+			helpers.statementArgumentsAdapter(this._owner.financialOperation, values)
 		);
 	}
 
@@ -279,7 +287,7 @@ class PostgresSqlStatement implements SqlStatement {
 			cancellationToken,
 			this._owner.pgClient,
 			this._sqlText,
-			helpers.statementArgumentsAdapter(values)
+			helpers.statementArgumentsAdapter(this._owner.financialOperation, values)
 		);
 
 		const underlyingResultRows = underlyingResult.rows;
@@ -292,7 +300,7 @@ class PostgresSqlStatement implements SqlStatement {
 		if (underlyingResultRows.length === 0) {
 			throw new SqlNoSuchRecordError(`executeSingle: No record for query ${this._sqlText}`);
 		} else if (underlyingResultRows.length === 1 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
-			return new PostgresSqlResultRecord(underlyingResultRows[0], underlyingResultFields);
+			return new PostgresSqlResultRecord(underlyingResultRows[0], underlyingResultFields, this._owner.financialOperation);
 		} else {
 			throw new InvalidOperationError("executeSingle: SQL query returns non-single result");
 		}
@@ -305,7 +313,7 @@ class PostgresSqlStatement implements SqlStatement {
 			cancellationToken,
 			this._owner.pgClient,
 			this._sqlText,
-			helpers.statementArgumentsAdapter(values)
+			helpers.statementArgumentsAdapter(this._owner.financialOperation, values)
 		);
 
 		const underlyingResultRows = underlyingResult.rows;
@@ -316,7 +324,7 @@ class PostgresSqlStatement implements SqlStatement {
 		}
 
 		if (underlyingResultRows.length > 0 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
-			return underlyingResultRows.map(row => new PostgresSqlResultRecord(row, underlyingResultFields));
+			return underlyingResultRows.map(row => new PostgresSqlResultRecord(row, underlyingResultFields, this._owner.financialOperation));
 		} else {
 			return [];
 		}
@@ -335,7 +343,7 @@ class PostgresSqlStatement implements SqlStatement {
 				cancellationToken,
 				this._owner.pgClient,
 				this._sqlText,
-				helpers.statementArgumentsAdapter(values)
+				helpers.statementArgumentsAdapter(this._owner.financialOperation, values)
 			);
 			cancellationToken.throwIfCancellationRequested();
 
@@ -353,7 +361,7 @@ class PostgresSqlStatement implements SqlStatement {
 				const queryFetchs = await helpers.executeRunQuery(cancellationToken, this._owner.pgClient, `FETCH ALL IN "${fetch}";`, []);
 				cancellationToken.throwIfCancellationRequested();
 
-				friendlyResult.push(queryFetchs.rows.map(row => new PostgresSqlResultRecord(row, queryFetchs.fields)));
+				friendlyResult.push(queryFetchs.rows.map(row => new PostgresSqlResultRecord(row, queryFetchs.fields, this._owner.financialOperation)));
 			}
 
 			// Executing: COMMIT
@@ -372,7 +380,7 @@ class PostgresSqlStatement implements SqlStatement {
 			cancellationToken,
 			this._owner.pgClient,
 			this._sqlText,
-			helpers.statementArgumentsAdapter(values)
+			helpers.statementArgumentsAdapter(this._owner.financialOperation, values)
 		);
 
 
@@ -390,7 +398,7 @@ class PostgresSqlStatement implements SqlStatement {
 		const value = underlyingFirstRow[Object.keys(underlyingFirstRow)[0]];
 		const fi = underlyingFields[0];
 		if (value !== undefined || fi !== undefined) {
-			return new PostgresData(value, fi);
+			return new PostgresData(value, fi, this._owner.financialOperation);
 		} else {
 			throw new SqlError(`executeScalar: Bad argument ${value} and ${fi}`);
 		}
@@ -401,7 +409,7 @@ class PostgresSqlStatement implements SqlStatement {
 			cancellationToken,
 			this._owner.pgClient,
 			this._sqlText,
-			helpers.statementArgumentsAdapter(values)
+			helpers.statementArgumentsAdapter(this._owner.financialOperation, values)
 		);
 
 		const underlyingRows = underlyingResult.rows;
@@ -415,7 +423,7 @@ class PostgresSqlStatement implements SqlStatement {
 			const value = underlyingFirstRow[Object.keys(underlyingFirstRow)[0]];
 			const fi = underlyingFields[0];
 			if (value !== undefined || fi !== undefined) {
-				return new PostgresData(value, fi);
+				return new PostgresData(value, fi, this._owner.financialOperation);
 			} else {
 				throw new SqlError(`executeScalarOrNull: Bad argument ${value} and ${fi}`);
 			}
@@ -431,16 +439,18 @@ namespace PostgresSqlResultRecord {
 	};
 }
 class PostgresSqlResultRecord implements SqlResultRecord {
+	private readonly _financialOperation: FinancialOperation;
 	private readonly _fieldsData: any;
 	private readonly _fieldsInfo: Array<pg.FieldDef>;
 	private _nameMap?: PostgresSqlResultRecord.NameMap;
 
-	public constructor(fieldsData: any, fieldsInfo: Array<pg.FieldDef>) {
+	public constructor(fieldsData: any, fieldsInfo: Array<pg.FieldDef>, financialOperation: FinancialOperation) {
 		if (Object.keys(fieldsData).length !== fieldsInfo.length) {
 			throw new Error("Internal error. Fields count is not equal to data columns.");
 		}
 		this._fieldsData = fieldsData;
 		this._fieldsInfo = fieldsInfo;
+		this._financialOperation = financialOperation;
 	}
 
 	public get(name: string): SqlData;
@@ -473,7 +483,7 @@ class PostgresSqlResultRecord implements SqlResultRecord {
 			throw new ArgumentError("index", `PostgresSqlResultRecord does not have field with index '${index}'`);
 		}
 		const value: any = this._fieldsData[fi.name];
-		return new PostgresData(value, fi);
+		return new PostgresData(value, fi, this._financialOperation);
 	}
 	private getByName(name: string): SqlData {
 		const fi = this.nameMap[name];
@@ -481,7 +491,7 @@ class PostgresSqlResultRecord implements SqlResultRecord {
 			throw new ArgumentError("name", `PostgresSqlResultRecord does not have field with name '${name}'`);
 		}
 		const value: any = this._fieldsData[fi.name];
-		return new PostgresData(value, fi);
+		return new PostgresData(value, fi, this._financialOperation);
 	}
 }
 
@@ -528,6 +538,7 @@ class PostgresTempTable extends Initable implements SqlTemporaryTable {
 }
 
 class PostgresData implements SqlData {
+	private readonly _financialOperation: FinancialOperation;
 	private readonly _postgresValue: any;
 	private readonly _fi: pg.FieldDef;
 
@@ -550,7 +561,7 @@ class PostgresData implements SqlData {
 	public get asString(): string {
 		if (this._postgresValue === null) {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
-		} else if (typeof this._postgresValue === "string") {
+		} else if (_.isString(this._postgresValue)) {
 			return this._postgresValue;
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
@@ -559,7 +570,7 @@ class PostgresData implements SqlData {
 	public get asNullableString(): string | null {
 		if (this._postgresValue === null) {
 			return null;
-		} else if (typeof this._postgresValue === "string") {
+		} else if (_.isString(this._postgresValue)) {
 			return this._postgresValue;
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
@@ -568,7 +579,7 @@ class PostgresData implements SqlData {
 	public get asInteger(): number {
 		if (this._postgresValue === null) {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
-		} else if (typeof this._postgresValue === "number" && Number.isInteger(this._postgresValue)) {
+		} else if (_.isNumber(this._postgresValue) && Number.isInteger(this._postgresValue)) {
 			return this._postgresValue;
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
@@ -577,7 +588,7 @@ class PostgresData implements SqlData {
 	public get asNullableInteger(): number | null {
 		if (this._postgresValue === null) {
 			return null;
-		} else if (typeof this._postgresValue === "number" && Number.isInteger(this._postgresValue)) {
+		} else if (_.isNumber(this._postgresValue) && Number.isInteger(this._postgresValue)) {
 			return this._postgresValue;
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
@@ -586,8 +597,10 @@ class PostgresData implements SqlData {
 	public get asNumber(): number {
 		if (this._postgresValue === null) {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
-		} else if (typeof this._postgresValue === "number") {
+		} else if (_.isNumber(this._postgresValue)) {
 			return this._postgresValue;
+		} else if (this._fi.dataTypeID === DATA_TYPE_ID_NUMERIC && _.isString(this._postgresValue)) {
+			return Number.parseFloat(this._postgresValue);
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
 		}
@@ -595,8 +608,10 @@ class PostgresData implements SqlData {
 	public get asNullableNumber(): number | null {
 		if (this._postgresValue === null) {
 			return null;
-		} else if (typeof this._postgresValue === "number") {
+		} else if (_.isNumber(this._postgresValue)) {
 			return this._postgresValue;
+		} else if (this._fi.dataTypeID === DATA_TYPE_ID_NUMERIC && _.isString(this._postgresValue)) {
+			return Number.parseFloat(this._postgresValue);
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
 		}
@@ -604,10 +619,10 @@ class PostgresData implements SqlData {
 	public get asFinancial(): Financial {
 		if (this._postgresValue === null) {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
-		} else if (typeof this._postgresValue === "number") {
-			return financial.fromFloat(this._postgresValue);
-		} else if (typeof this._postgresValue === "string") {
-			return financial.parse(this._postgresValue);
+		} else if (_.isNumber(this._postgresValue)) {
+			return this._financialOperation.fromFloat(this._postgresValue);
+		} else if (_.isString(this._postgresValue)) {
+			return this._financialOperation.parse(this._postgresValue);
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
 		}
@@ -615,10 +630,10 @@ class PostgresData implements SqlData {
 	public get asNullableFinancial(): Financial | null {
 		if (this._postgresValue === null) {
 			return null;
-		} else if (typeof this._postgresValue === "number") {
-			return financial.fromFloat(this._postgresValue);
-		} else if (typeof this._postgresValue === "string") {
-			return financial.parse(this._postgresValue);
+		} else if (_.isNumber(this._postgresValue)) {
+			return this._financialOperation.fromFloat(this._postgresValue);
+		} else if (_.isString(this._postgresValue)) {
+			return this._financialOperation.parse(this._postgresValue);
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
 		}
@@ -680,12 +695,13 @@ class PostgresData implements SqlData {
 		}
 	}
 
-	public constructor(postgresValue: any, fi: pg.FieldDef) {
+	public constructor(postgresValue: any, fi: pg.FieldDef, financialOperation: FinancialOperation) {
 		if (postgresValue === undefined) {
 			throw new ArgumentError("postgresValue");
 		}
 		this._postgresValue = postgresValue;
 		this._fi = fi;
+		this._financialOperation = financialOperation;
 	}
 
 	private formatWrongDataTypeMessage(): string {
@@ -737,18 +753,20 @@ namespace helpers {
 			});
 		});
 	}
-	export function executeRunQuery(
+	export async function executeRunQuery(
 		cancellationToken: CancellationToken, db: pg.PoolClient, sqlText: string, values: Array<SqlStatementParam>
 	): Promise<pg.QueryResult> {
-		return new Promise<pg.QueryResult>((resolve, reject) => {
-			db.query(sqlText, values,
-				(err: any, underlyingResult: pg.QueryResult) => {
-					if (err) {
-						return reject(err);
-					}
-					return resolve(underlyingResult);
-				});
-		}).catch(function (reason) {
+		try {
+			return await new Promise<pg.QueryResult>((resolve, reject) => {
+				db.query(sqlText, values,
+					(err: any, underlyingResult: pg.QueryResult) => {
+						if (err) {
+							return reject(err);
+						}
+						return resolve(underlyingResult);
+					});
+			});
+		} catch (reason) {
 			const err = wrapErrorIfNeeded(reason);
 
 			if ("code" in reason) {
@@ -774,12 +792,12 @@ namespace helpers {
 				}
 			}
 			throw new SqlError(`Unexpected error: ${err.message}`, err);
-		});
+		}
 	}
-	export function statementArgumentsAdapter(args: Array<SqlStatementParam>): Array<any> {
+	export function statementArgumentsAdapter(financialOperation: FinancialOperation, args: Array<SqlStatementParam>): Array<any> {
 		return args.map(value => {
 			if (typeof value === "object") {
-				if (value !== null && financial.isFinancial(value)) {
+				if (value !== null && financialOperation.isFinancial(value)) {
 					return value.toString(); // Financial should be converted to string
 				}
 			}

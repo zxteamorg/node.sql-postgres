@@ -20,6 +20,16 @@ CREATE TABLE "tb_2" (
 INSERT INTO "tb_2"("first_name","last_name") VALUES ('Maxim', 'Anurin');
 INSERT INTO "tb_2"("first_name","last_name") VALUES ('Serhii', 'Zghama');
 
+-- DROP TABLE IF EXISTS "tb_financial";
+CREATE TABLE "tb_financial" (
+	"id"         INT NOT NULL,
+	"varchar"    VARCHAR(128) NOT NULL,
+	"int"        INT NOT NULL,
+	"decimal"    DECIMAL (48,24) NOT NULL,
+	PRIMARY KEY ("id")
+);
+INSERT INTO "tb_financial"("id","varchar","int","decimal") VALUES (1, '42.42', 42, 424242424242424242424242.424242424242424242421111);
+
 
 -- DROP TABLE IF EXISTS "tb_dates_test";
 SET TIMEZONE = 'UTC'; 
