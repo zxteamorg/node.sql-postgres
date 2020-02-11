@@ -198,7 +198,7 @@ myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () 
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asNullableBoolean, null);
 	});
-	it.only("Read financial through executeSingle", async function () {
+	it("Read financial through executeSingle", async function () {
 		const result = await getSqlProvider()
 			.statement('SELECT "varchar","int","decimal" FROM tb_financial WHERE "id" = 1')
 			.executeSingle(DUMMY_CANCELLATION_TOKEN);
