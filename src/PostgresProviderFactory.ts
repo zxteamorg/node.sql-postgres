@@ -145,12 +145,6 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 			}
 		})();
 
-		// this._activeProviderUsings.add(executionPromise);
-
-		// executionPromise.catch(function () { /* BYPASS */ }).finally(() => {
-		// 	this._activeProviderUsings.delete(executionPromise);
-		// });
-
 		return executionPromise;
 	}
 
@@ -282,30 +276,6 @@ class PostgresSqlStatement implements SqlStatement {
 		);
 	}
 
-	public async executeSingle(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Promise<SqlResultRecord> {
-		const underlyingResult = await helpers.executeRunQuery(
-			cancellationToken,
-			this._owner.pgClient,
-			this._sqlText,
-			helpers.statementArgumentsAdapter(this._owner.financialOperation, values)
-		);
-
-		const underlyingResultRows = underlyingResult.rows;
-		const underlyingResultFields = underlyingResult.fields;
-
-		if (underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_MULTI) {
-			throw new InvalidOperationError("executeQuery does not support multi request");
-		}
-
-		if (underlyingResultRows.length === 0) {
-			throw new SqlNoSuchRecordError(`executeSingle: No record for query ${this._sqlText}`);
-		} else if (underlyingResultRows.length === 1 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
-			return new PostgresSqlResultRecord(underlyingResultRows[0], underlyingResultFields, this._owner.financialOperation);
-		} else {
-			throw new InvalidOperationError("executeSingle: SQL query returns non-single result");
-		}
-	}
-
 	public async executeQuery(
 		cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>
 	): Promise<Array<SqlResultRecord>> {
@@ -429,6 +399,56 @@ class PostgresSqlStatement implements SqlStatement {
 			}
 		} else {
 			return null;
+		}
+	}
+
+	public async executeSingle(cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>): Promise<SqlResultRecord> {
+		const underlyingResult = await helpers.executeRunQuery(
+			cancellationToken,
+			this._owner.pgClient,
+			this._sqlText,
+			helpers.statementArgumentsAdapter(this._owner.financialOperation, values)
+		);
+
+		const underlyingResultRows = underlyingResult.rows;
+		const underlyingResultFields = underlyingResult.fields;
+
+		if (underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_MULTI) {
+			throw new InvalidOperationError("executeQuery does not support multi request");
+		}
+
+		if (underlyingResultRows.length === 0) {
+			throw new SqlNoSuchRecordError(`executeSingle: No record for query ${this._sqlText}`);
+		} else if (underlyingResultRows.length === 1 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
+			return new PostgresSqlResultRecord(underlyingResultRows[0], underlyingResultFields, this._owner.financialOperation);
+		} else {
+			throw new InvalidOperationError("executeSingle: SQL query returns non-single result");
+		}
+	}
+
+	public async executeSingleOrNull(
+		cancellationToken: CancellationToken, ...values: Array<SqlStatementParam>
+	): Promise<SqlResultRecord | null> {
+		const underlyingResult = await helpers.executeRunQuery(
+			cancellationToken,
+			this._owner.pgClient,
+			this._sqlText,
+			helpers.statementArgumentsAdapter(this._owner.financialOperation, values)
+		);
+
+		const underlyingResultRows = underlyingResult.rows;
+		const underlyingResultFields = underlyingResult.fields;
+
+		if (underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_MULTI) {
+			throw new InvalidOperationError("executeQuery does not support multi request");
+		}
+
+		if (underlyingResultRows.length === 0) {
+			return null;
+		} else if (underlyingResultRows.length === 1 && !(underlyingResultFields[0].dataTypeID === DATA_TYPE_ID_EMPTY)) {
+			return new PostgresSqlResultRecord(underlyingResultRows[0], underlyingResultFields, this._owner.financialOperation);
+		} else {
+			throw new InvalidOperationError("executeSingle: SQL query returns non-single result");
 		}
 	}
 }
@@ -724,7 +744,7 @@ const DUMMY_LOGGER: Logger = Object.freeze({
 	error(message: string, ...args: any[]): void { /* NOP */ },
 	fatal(message: string, ...args: any[]): void { /* NOP */ },
 
-	getLogger(name?: string): Logger { /* NOP */ return this; }
+	getLogger(name?: string): Logger { /* NOP */ return DUMMY_LOGGER; }
 });
 
 namespace helpers {
