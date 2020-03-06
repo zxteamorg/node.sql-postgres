@@ -10,7 +10,7 @@ import {
 	SqlProviderFactory, SqlProvider, SqlStatement,
 	SqlStatementParam, SqlResultRecord, SqlData,
 	SqlTemporaryTable, SqlDialect, SqlError,
-	SqlSyntaxError, SqlConstraintError, SqlNoSuchRecordError
+	SqlSyntaxError, SqlConstraintError, SqlPermissionError, SqlNoSuchRecordError
 } from "@zxteam/sql";
 
 import * as _ from "lodash";
@@ -805,13 +805,19 @@ namespace helpers {
 					case "40002":
 					case "42000":
 					case "44000":
-						throw new SqlConstraintError(`SQL Constraint restriction happened: ${err.message}`, "???", err);
+						throw new SqlConstraintError(
+							`SQL Constraint restriction happened. Query: ${sqlText}. Reason Message: ${err.message}. See innerError for details.`,
+							_.isString(reason.constraint) ? reason.constraint : "???",
+							err
+						);
+					case "42501":
+						throw new SqlPermissionError(`Insufficient permission to execute a query. Query: ${sqlText}. Reason Message: ${err.message}. See innerError for details.`, err);
 					case "42000":
 					case "42601":
-						throw new SqlSyntaxError(`Looks like wrong SQL syntax detected: ${err.message}. See innerError for details.`, err);
+						throw new SqlSyntaxError(`Looks like wrong SQL syntax detected. Query: ${sqlText}. Reason Message: ${err.message}. See innerError for details.`, err);
 				}
 			}
-			throw new SqlError(`Unexpected error: ${err.message}`, err);
+			throw new SqlError(`Unexpected error occurs while executing a query. Query: ${sqlText}. Reason Message: ${err.message}. See innerError for details.`, err);
 		}
 	}
 	export function statementArgumentsAdapter(financialOperation: FinancialOperation, args: Array<SqlStatementParam>): Array<any> {
