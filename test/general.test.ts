@@ -2,8 +2,7 @@ import { CancellationToken, Financial } from "@zxteam/contract";
 import { DUMMY_CANCELLATION_TOKEN } from "@zxteam/cancellation";
 import { logger } from "@zxteam/logger";
 import { FinancialOperation, Settings as FinancialSettings, setup as financialSetup } from "@zxteam/financial";
-import ensureFactory from "@zxteam/ensure";
-import { SqlProvider, SqlSyntaxError, SqlConstraintError, SqlError } from "@zxteam/sql";
+import { SqlProvider, SqlSyntaxError, SqlConstraintError, SqlError, MigrationSources } from "@zxteam/sql";
 
 import * as chai from "chai";
 import { PendingSuiteFunction, Suite, SuiteFunction } from "mocha";
@@ -106,17 +105,16 @@ myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () 
 		});
 		await sqlProviderFactory.init(DUMMY_CANCELLATION_TOKEN);
 		try {
+			const migrationSources: MigrationSources = await MigrationSources.loadFromFilesystem(
+				DUMMY_CANCELLATION_TOKEN,
+				path.normalize(path.join(__dirname, "..", "test.files", "general"))
+			);
+
 			const manager = new PostgresMigrationManager({
-				migrationFilesRootPath: path.normalize(path.join(__dirname, "..", "test.files", "general")),
-				sqlProviderFactory, log
+				migrationSources, sqlProviderFactory, log
 			});
 
-			await manager.init(DUMMY_CANCELLATION_TOKEN);
-			try {
-				await manager.migrate(DUMMY_CANCELLATION_TOKEN);
-			} finally {
-				await manager.dispose();
-			}
+			await manager.install(DUMMY_CANCELLATION_TOKEN);
 
 		} catch (e) {
 			await sqlProviderFactory.dispose();
@@ -669,17 +667,16 @@ myDescribe(`PostgreSQL Tests via usingProvider (schema:general_test_2_${timestam
 		});
 		await sqlProviderFactory.init(DUMMY_CANCELLATION_TOKEN);
 		try {
+			const migrationSources: MigrationSources = await MigrationSources.loadFromFilesystem(
+				DUMMY_CANCELLATION_TOKEN,
+				path.normalize(path.join(__dirname, "..", "test.files", "general"))
+			);
+
 			const manager = new PostgresMigrationManager({
-				migrationFilesRootPath: path.normalize(path.join(__dirname, "..", "test.files", "general")),
-				sqlProviderFactory, log
+				migrationSources, sqlProviderFactory, log
 			});
 
-			await manager.init(DUMMY_CANCELLATION_TOKEN);
-			try {
-				await manager.migrate(DUMMY_CANCELLATION_TOKEN);
-			} finally {
-				await manager.dispose();
-			}
+			await manager.install(DUMMY_CANCELLATION_TOKEN);
 
 		} catch (e) {
 			await sqlProviderFactory.dispose();
@@ -715,17 +712,16 @@ myDescribe(`PostgreSQL Tests via usingProviderWithTransaction (schema:general_te
 		});
 		await sqlProviderFactory.init(DUMMY_CANCELLATION_TOKEN);
 		try {
+			const migrationSources: MigrationSources = await MigrationSources.loadFromFilesystem(
+				DUMMY_CANCELLATION_TOKEN,
+				path.normalize(path.join(__dirname, "..", "test.files", "general"))
+			);
+
 			const manager = new PostgresMigrationManager({
-				migrationFilesRootPath: path.normalize(path.join(__dirname, "..", "test.files", "general")),
-				sqlProviderFactory, log
+				migrationSources, sqlProviderFactory, log
 			});
 
-			await manager.init(DUMMY_CANCELLATION_TOKEN);
-			try {
-				await manager.migrate(DUMMY_CANCELLATION_TOKEN);
-			} finally {
-				await manager.dispose();
-			}
+			await manager.install(DUMMY_CANCELLATION_TOKEN);
 
 		} catch (e) {
 			await sqlProviderFactory.dispose();

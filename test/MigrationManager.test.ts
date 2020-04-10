@@ -6,6 +6,7 @@ import { PendingSuiteFunction, Suite, SuiteFunction } from "mocha";
 import * as path from "path";
 
 import { PostgresMigrationManager, PostgresProviderFactory } from "../src";
+import { MigrationSources } from "@zxteam/sql";
 
 const { myDescribe, TEST_DB_URL } = (function (): {
 	myDescribe: PendingSuiteFunction | SuiteFunction;
@@ -56,17 +57,16 @@ myDescribe(`MigrationManager (schema:migration_${timestamp})`, function (this: S
 		});
 		await sqlProviderFactory.init(DUMMY_CANCELLATION_TOKEN);
 		try {
+			const migrationSources: MigrationSources = await MigrationSources.loadFromFilesystem(
+				DUMMY_CANCELLATION_TOKEN,
+				path.normalize(path.join(__dirname, "..", "test.files", "MigrationManager_1"))
+			);
+
 			const manager = new PostgresMigrationManager({
-				migrationFilesRootPath: path.normalize(path.join(__dirname, "..", "test.files", "MigrationManager_1")),
-				sqlProviderFactory, log
+				migrationSources, sqlProviderFactory, log
 			});
 
-			await manager.init(DUMMY_CANCELLATION_TOKEN);
-			try {
-				await manager.migrate(DUMMY_CANCELLATION_TOKEN);
-			} finally {
-				await manager.dispose();
-			}
+			await manager.install(DUMMY_CANCELLATION_TOKEN);
 
 		} finally {
 			await sqlProviderFactory.dispose();

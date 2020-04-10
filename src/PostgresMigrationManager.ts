@@ -59,6 +59,26 @@ export class PostgresMigrationManager extends MigrationManager {
 		).execute(cancellationToken);
 	}
 
+	protected async _insertVersionLog(
+		cancellationToken: CancellationToken, sqlProvider: SqlProvider, version: string, logText: string
+	): Promise<void> {
+		await sqlProvider.statement(
+			`INSERT INTO "${this.versionTableName}"("version", "log") VALUES($1, $2)`
+		).execute(cancellationToken, version, logText);
+	}
+
+	protected async _isVersionLogExist(cancellationToken: CancellationToken, sqlProvider: SqlProvider, version: string): Promise<boolean> {
+		const isExistSqlData = await sqlProvider.statement(
+			`SELECT 1 FROM "${this._schema}"."${this.versionTableName}" ` +
+			`WHERE "version" = $1`
+		).executeScalarOrNull(cancellationToken, version);
+
+		if (isExistSqlData === null) { return false; }
+		if (isExistSqlData.asInteger !== 1) { throw new PostgresMigrationManager.MigrationError("Unexpected SQL result"); }
+
+		return true;
+	}
+
 	protected async _isVersionTableExist(cancellationToken: CancellationToken, sqlProvider: SqlProvider): Promise<boolean> {
 		const isExistSqlData = await sqlProvider.statement(
 			`SELECT 1 FROM "pg_catalog"."pg_tables" WHERE "schemaname" != 'pg_catalog' AND "schemaname" != 'information_schema' AND "schemaname" = $1 AND "tablename" = $2`
@@ -70,13 +90,13 @@ export class PostgresMigrationManager extends MigrationManager {
 		return true;
 	}
 
-	protected async _insertVersionLog(
-		cancellationToken: CancellationToken, sqlProvider: SqlProvider, version: string, logText: string
-	): Promise<void> {
+	protected async _removeVersionLog(cancellationToken: CancellationToken, sqlProvider: SqlProvider, version: string): Promise<void> {
 		await sqlProvider.statement(
-			`INSERT INTO "${this.versionTableName}"("version", "log") VALUES($1, $2)`
-		).execute(cancellationToken, version, logText);
+			`DELETE FROM "${this._schema}"."${this.versionTableName}" ` +
+			`WHERE "version" = $1`
+		).execute(cancellationToken, version);
 	}
+
 
 	protected async _verifyVersionTableStructure(cancellationToken: CancellationToken, sqlProvider: SqlProvider): Promise<void> {
 		const isExist = await this._isVersionTableExist(cancellationToken, sqlProvider);

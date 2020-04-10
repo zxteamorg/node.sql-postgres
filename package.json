@@ -1,6 +1,6 @@
 {
 	"name": "@zxteam/sql-postgres",
-	"version": "6.0.57",
+	"version": "6.0.59",
 	"description": "ZXTeam's SQL implementation for PostgreSQL",
 	"main": "./src/index.js",
 	"types": "./src/index.d.ts",
@@ -38,13 +38,13 @@
 	"dependencies": {
 		"@types/pg": "^7.14.1",
 		"@zxteam/cancellation": "^6.0.40",
-		"@zxteam/contract": "^6.0.56",
+		"@zxteam/contract": "^6.0.60",
 		"@zxteam/disposable": "^6.0.56",
-		"@zxteam/errors": "^6.0.41",
+		"@zxteam/errors": "^6.0.57",
 		"@zxteam/financial": "^6.0.56",
-		"@zxteam/sql": "^6.0.57",
+		"@zxteam/sql": "^6.0.59",
 		"lodash": "^4.17.15",
-		"pg": "^7.18.2"
+		"pg": "^8.0.0"
 	},
 	"repository": {
 		"type": "git",
