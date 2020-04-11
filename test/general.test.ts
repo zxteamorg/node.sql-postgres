@@ -9,6 +9,7 @@ import { PendingSuiteFunction, Suite, SuiteFunction } from "mocha";
 import * as path from "path";
 
 import { PostgresProviderFactory, PostgresMigrationManager } from "../src";
+import { InvalidOperationError } from "@zxteam/errors";
 
 declare global {
 	namespace Chai {
@@ -55,23 +56,23 @@ const { myDescribe, TEST_DB_URL } = (function (): {
 			const port = 5432;
 			const user = "postgres";
 			testDbUrl = `postgres://${user}@${host}:${port}/emptytestdb`;
-			return { myDescribe: describe, TEST_DB_URL: testDbUrl };
+			return Object.freeze({ myDescribe: describe, TEST_DB_URL: testDbUrl });
 		}
 	}
 
 	let url: URL;
 	try { url = new URL(testDbUrl); } catch (e) {
 		console.warn(`The tests ${__filename} are skipped due TEST_DB_URL has wrong value. Expected URL like postgres://testuser:testpwd@127.0.0.1:5432/db`);
-		return { myDescribe: describe.skip, TEST_DB_URL: testDbUrl };
+		return Object.freeze({ myDescribe: describe.skip, TEST_DB_URL: testDbUrl });
 	}
 
 	switch (url.protocol) {
-		case "postgres:": {
-			return { myDescribe: describe, TEST_DB_URL: testDbUrl };
-		}
+		case "postgres:":
+		case "postgres+ssl:":
+			return Object.freeze({ myDescribe: describe, TEST_DB_URL: testDbUrl });
 		default: {
 			console.warn(`The tests ${__filename} are skipped due TEST_DB_URL has wrong value. Unsupported protocol: ${url.protocol}`);
-			return { myDescribe: describe.skip, TEST_DB_URL: testDbUrl };
+			return Object.freeze({ myDescribe: describe.skip, TEST_DB_URL: testDbUrl });
 		}
 	}
 })();
@@ -325,7 +326,7 @@ myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () 
 	it("Read 2018-05-01T12:01:03.345 as Date through executeScalar", async function () {
 		const result = await getSqlProvider()
 			.statement(
-				"SELECT TIMESTAMP '2018-05-01 12:01:02.345' AS c0, NOW() AS c1 UNION ALL SELECT NOW(), NOW()")
+				"SELECT '2018-05-01 12:01:02.345'::TIMESTAMP AS c0, now() AT TIME ZONE 'utc' AS c1 UNION ALL SELECT now() AT TIME ZONE 'utc', now() AT TIME ZONE 'utc'")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equalDate(result.asDate, new Date(2018, 4/*May month = 4*/, 1, 12, 1, 2, 345));
 	});
@@ -333,7 +334,7 @@ myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () 
 		const result = await getSqlProvider()
 			.statement(
 				"SELECT NULL AS c0, "
-				+ " NOW() AS c1 UNION ALL SELECT NOW(), NOW()")
+				+ " now() AT TIME ZONE 'utc' AS c1 UNION ALL SELECT now() AT TIME ZONE 'utc', now() AT TIME ZONE 'utc'")
 			.executeScalar(DUMMY_CANCELLATION_TOKEN); // executeScalar() should return first row + first column
 		assert.equal(result.asNullableDate, null);
 	});
@@ -522,24 +523,29 @@ myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () 
 		assert.equal(resultArray.length, 3);
 	});
 
-	it("Should be able read TIMESTAMP", async function () {
+	it("Should be able read TIMESTAMP WITHOUT TIME ZONE", async function () {
 		const result = await getSqlProvider()
 			.statement("SELECT ts FROM tb_dates_test WHERE id = 1")
 			.executeSingle(DUMMY_CANCELLATION_TOKEN);
-		const dirtyTs: Date = result.get("ts").asDate;
-		const ts = new Date(dirtyTs.getTime() - dirtyTs.getTimezoneOffset() * 60000);
+		const ts: Date = result.get("ts").asDate;
 		assert.equal(ts.getTime(), 1466622000410); // 1466622000410 --> "2016-06-22T19:00:00.410Z"
 		assert.equal(ts.toISOString(), "2016-06-22T19:00:00.410Z");
 	});
-	it("Should be able read TIMESTAMPTZ", async function () {
+	it("Should raise exception when read TIMESTAMP WITH TIME ZONE", async function () {
 		const result = await getSqlProvider()
 			.statement("SELECT tstz FROM tb_dates_test WHERE id = 1")
 			.executeSingle(DUMMY_CANCELLATION_TOKEN);
-		const datetz = result.get("tstz").asDate;
-		assert.equal(datetz.getTime(), 1466622000410); // 1466622000410 --> "2016-06-22T19:00:00.410Z"
-		assert.equal(datetz.toISOString(), "2016-06-22T19:00:00.410Z");
+		let err!: InvalidOperationError;
+		try {
+			const stub = result.get("tstz").asDate;
+		} catch (e) {
+			err = e;
+		}
+		assert.isDefined(err);
+		assert.instanceOf(err, InvalidOperationError);
+		assert.include(err.message, "Right now the library supports TIMESTAMP WITHOUT TIME ZONE");
 	});
-	it("Should be able insert TIMESTAMP", async function () {
+	it("Should be able insert TIMESTAMP WITHOUT TIME ZONE", async function () {
 		const testDate = new Date();
 
 		const insertId = await getSqlProvider()

@@ -15,3 +15,28 @@ CREATE TABLE "__dbVersion" (
 )
 ```
 NOTE: Name of table may be overriden via migration's opts
+
+## Connection URL
+
+### Format
+
+```
+postgres://[${user}[:${password}]]@${host}[:${port}]/${databaseName}[?app=${applicationName}&schema=${defaultSchema}]
+postgres+ssl://[${user}[:${password}]]@${host}[:${port}]/${databaseName}[?app=${applicationName}&schema=${defaultSchema}]
+```
+
+### Examples
+
+#### Localhost
+
+```
+postgres://localhost:5432/postgres
+```
+
+#### Remote PostgreSQL server `my_pg_host` with SSL prefer mode (no certificate validation, just for encryption)
+
+```
+postgres+ssl://my_pg_host:5432/postgres
+```
+
+Note: For full SSL mode you need to pass `opts.ssl` programically. Passing certificates via URL does not supported.

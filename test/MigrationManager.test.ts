@@ -25,23 +25,23 @@ const { myDescribe, TEST_DB_URL } = (function (): {
 			const port = 5432;
 			const user = "postgres";
 			testDbUrl = `postgres://${user}@${host}:${port}/emptytestdb`;
-			return { myDescribe: describe, TEST_DB_URL: testDbUrl };
+			return Object.freeze({ myDescribe: describe, TEST_DB_URL: testDbUrl });
 		}
 	}
 
 	let url: URL;
 	try { url = new URL(testDbUrl); } catch (e) {
 		console.warn(`The tests ${__filename} are skipped due TEST_DB_URL has wrong value. Expected URL like postgres://testuser:testpwd@127.0.0.1:5432/db`);
-		return { myDescribe: describe.skip, TEST_DB_URL: testDbUrl };
+		return Object.freeze({ myDescribe: describe.skip, TEST_DB_URL: testDbUrl });
 	}
 
 	switch (url.protocol) {
-		case "postgres:": {
-			return { myDescribe: describe, TEST_DB_URL: testDbUrl };
-		}
+		case "postgres:":
+		case "postgres+ssl:":
+			return Object.freeze({ myDescribe: describe, TEST_DB_URL: testDbUrl });
 		default: {
 			console.warn(`The tests ${__filename} are skipped due TEST_DB_URL has wrong value. Unsupported protocol: ${url.protocol}`);
-			return { myDescribe: describe.skip, TEST_DB_URL: testDbUrl };
+			return Object.freeze({ myDescribe: describe.skip, TEST_DB_URL: testDbUrl });
 		}
 	}
 })();
