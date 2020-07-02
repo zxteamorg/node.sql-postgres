@@ -228,8 +228,8 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 		poolConfig.database = pathname;
 
 		// Timeouts
-		if (opts.connectionTimeoutMillis !== undefined) { poolConfig.connectionTimeoutMillis = opts.connectionTimeoutMillis; }
-		if (opts.connectionTimeoutMillis !== undefined) { poolConfig.idleTimeoutMillis = opts.idleTimeoutMillis; }
+		poolConfig.connectionTimeoutMillis = (opts.connectionTimeoutMillis !== undefined) ? opts.idleTimeoutMillis : 5000;
+		poolConfig.idleTimeoutMillis = (opts.idleTimeoutMillis !== undefined) ? opts.idleTimeoutMillis : 30000;
 
 		// App name
 		if (!_.isEmpty(opts.applicationName)) {
@@ -404,7 +404,13 @@ export namespace PostgresProviderFactory {
 		 */
 		readonly applicationName?: string;
 		readonly log?: Logger;
+		/**
+		 * @default 5000
+		 */
 		readonly connectionTimeoutMillis?: number;
+		/**
+		 * @default 30000
+		 */
 		readonly idleTimeoutMillis?: number;
 		readonly financialOperation?: FinancialOperation;
 		readonly ssl?: "prefer" | {
@@ -554,6 +560,11 @@ class PostgresSqlStatement implements SqlStatement {
 		}
 
 		const underlyingFields = underlyingResult.fields;
+
+		if (underlyingFields.length === 0) {
+			throw new InvalidOperationError("executeScalar: SQL query returns no result");
+		}
+
 		if (underlyingFields[0].dataTypeID === PostgresObjectID.refcursor) {
 			throw new InvalidOperationError("executeScalar: does not support multiset request yet");
 		}
@@ -607,8 +618,12 @@ class PostgresSqlStatement implements SqlStatement {
 		const underlyingResultRows = underlyingResult.rows;
 		const underlyingResultFields = underlyingResult.fields;
 
+		if (underlyingResultFields.length === 0) {
+			throw new InvalidOperationError("executeSingle: SQL query returns no result");
+		}
+
 		if (underlyingResultFields[0].dataTypeID === PostgresObjectID.refcursor) {
-			throw new InvalidOperationError("executeQuery does not support multi request");
+			throw new InvalidOperationError("executeSingle: does not support multi request");
 		}
 
 		if (underlyingResultRows.length === 0) {
@@ -616,7 +631,7 @@ class PostgresSqlStatement implements SqlStatement {
 		} else if (underlyingResultRows.length === 1 && !(underlyingResultFields[0].dataTypeID === PostgresObjectID.void)) {
 			return new PostgresSqlResultRecord(underlyingResultRows[0], underlyingResultFields, this._owner.financialOperation);
 		} else {
-			throw new InvalidOperationError("executeSingle: SQL query returns non-single result");
+			throw new InvalidOperationError(`executeSingle: SQL query returns non-single result`);
 		}
 	}
 
@@ -633,8 +648,12 @@ class PostgresSqlStatement implements SqlStatement {
 		const underlyingResultRows = underlyingResult.rows;
 		const underlyingResultFields = underlyingResult.fields;
 
+		if (underlyingResultFields.length === 0) {
+			throw new InvalidOperationError("executeSingleOrNull: SQL query returns no result");
+		}
+
 		if (underlyingResultFields[0].dataTypeID === PostgresObjectID.refcursor) {
-			throw new InvalidOperationError("executeQuery does not support multi request");
+			throw new InvalidOperationError("executeSingleOrNull: does not support multi request");
 		}
 
 		if (underlyingResultRows.length === 0) {
@@ -642,7 +661,7 @@ class PostgresSqlStatement implements SqlStatement {
 		} else if (underlyingResultRows.length === 1 && !(underlyingResultFields[0].dataTypeID === PostgresObjectID.void)) {
 			return new PostgresSqlResultRecord(underlyingResultRows[0], underlyingResultFields, this._owner.financialOperation);
 		} else {
-			throw new InvalidOperationError("executeSingle: SQL query returns non-single result");
+			throw new InvalidOperationError("executeSingleOrNull: SQL query returns non-single result");
 		}
 	}
 }
