@@ -231,6 +231,10 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 		poolConfig.connectionTimeoutMillis = (opts.connectionTimeoutMillis !== undefined) ? opts.connectionTimeoutMillis : 5000;
 		poolConfig.idleTimeoutMillis = (opts.idleTimeoutMillis !== undefined) ? opts.idleTimeoutMillis : 30000;
 
+		// Keep-alive
+		poolConfig.keepAlive = (opts.keepAlive !== undefined) ? opts.keepAlive : true;
+		poolConfig.keepAliveInitialDelayMillis = (opts.keepAliveInitialDelayMillis !== undefined) ? opts.keepAliveInitialDelayMillis : 5000;
+
 		// App name
 		if (!_.isEmpty(opts.applicationName)) {
 			poolConfig.application_name = opts.applicationName;
@@ -412,6 +416,17 @@ export namespace PostgresProviderFactory {
 		 * @default 30000
 		 */
 		readonly idleTimeoutMillis?: number;
+
+		/**
+		 * @default true
+		 */
+		keepAlive?: boolean;
+
+		/**
+		 * @default 5000
+		 */
+		keepAliveInitialDelayMillis?: number;
+
 		readonly financialOperation?: FinancialOperation;
 		readonly ssl?: "prefer" | {
 			readonly caCert?: Buffer;
