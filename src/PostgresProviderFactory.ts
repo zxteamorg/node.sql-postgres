@@ -228,7 +228,7 @@ export class PostgresProviderFactory extends Initable implements SqlProviderFact
 		poolConfig.database = pathname;
 
 		// Timeouts
-		poolConfig.connectionTimeoutMillis = (opts.connectionTimeoutMillis !== undefined) ? opts.idleTimeoutMillis : 5000;
+		poolConfig.connectionTimeoutMillis = (opts.connectionTimeoutMillis !== undefined) ? opts.connectionTimeoutMillis : 5000;
 		poolConfig.idleTimeoutMillis = (opts.idleTimeoutMillis !== undefined) ? opts.idleTimeoutMillis : 30000;
 
 		// App name
