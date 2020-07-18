@@ -43,7 +43,7 @@
 		"@zxteam/errors": "^6.0.61",
 		"@zxteam/financial": "^6.0.56",
 		"@zxteam/sql": "^6.0.65",
-		"lodash": "^4.17.15",
+		"lodash": "^4.17.19",
 		"pg": "^8.2.1"
 	},
 	"repository": {
