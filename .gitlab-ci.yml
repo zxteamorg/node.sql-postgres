@@ -1,4 +1,4 @@
-include: 'http://dev.zxteam.net/pub/gitlab-pipelines/raw/v1/node/public-lib.yml'
+include: 'http://dev.zxteam.net/pub/gitlab-pipelines/raw/v3/node/public-lib.yml'
 
 cache:
   paths:

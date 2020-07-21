@@ -1,6 +1,6 @@
 {
 	"name": "@zxteam/sql-postgres",
-	"version": "6.0.64",
+	"version": "6.0.66",
 	"description": "ZXTeam's SQL implementation for PostgreSQL",
 	"main": "./src/index.js",
 	"types": "./src/index.d.ts",
@@ -29,22 +29,22 @@
 	"devDependencies": {
 		"@types/chai-datetime": "0.0.33",
 		"@types/lodash": "^4.14.157",
-		"@zxnode/build": "0.0.34",
-		"@zxteam/ensure": "^6.0.56",
-		"@zxteam/logger": "^6.0.40",
+		"@zxnode/build": "^0.0.38",
+		"@zxteam/ensure": "^6.0.63",
+		"@zxteam/logger": "^6.0.62",
 		"chai-datetime": "^1.7.0",
 		"ts-node": "^8.10.2"
 	},
 	"dependencies": {
-		"@types/pg": "^7.14.3",
-		"@zxteam/cancellation": "^6.0.40",
+		"@types/pg": "^7.14.4",
+		"@zxteam/cancellation": "^6.0.62",
 		"@zxteam/contract": "^6.0.62",
-		"@zxteam/disposable": "^6.0.56",
-		"@zxteam/errors": "^6.0.61",
-		"@zxteam/financial": "^6.0.56",
-		"@zxteam/sql": "^6.0.65",
-		"lodash": "^4.17.15",
-		"pg": "^8.2.1"
+		"@zxteam/disposable": "^6.0.63",
+		"@zxteam/errors": "^6.0.62",
+		"@zxteam/financial": "^6.0.62",
+		"@zxteam/sql": "^6.0.66",
+		"lodash": "^4.17.19",
+		"pg": "^8.3.0"
 	},
 	"repository": {
 		"type": "git",
