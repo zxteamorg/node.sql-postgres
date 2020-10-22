@@ -794,7 +794,7 @@ class PostgresData implements SqlData {
 		if (typeof this._postgresValue === "boolean") {
 			return this._postgresValue;
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asBoolean"));
 		}
 	}
 	public get asNullableBoolean(): boolean | null {
@@ -803,16 +803,16 @@ class PostgresData implements SqlData {
 		} else if (typeof this._postgresValue === "boolean") {
 			return this._postgresValue;
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asNullableBoolean"));
 		}
 	}
 	public get asString(): string {
 		if (this._postgresValue === null) {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asString"));
 		} else if (_.isString(this._postgresValue)) {
 			return this._postgresValue;
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asString"));
 		}
 	}
 	public get asNullableString(): string | null {
@@ -821,16 +821,16 @@ class PostgresData implements SqlData {
 		} else if (_.isString(this._postgresValue)) {
 			return this._postgresValue;
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asNullableString"));
 		}
 	}
 	public get asInteger(): number {
 		if (this._postgresValue === null) {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asInteger"));
 		} else if (_.isNumber(this._postgresValue) && Number.isInteger(this._postgresValue)) {
 			return this._postgresValue;
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asInteger"));
 		}
 	}
 	public get asNullableInteger(): number | null {
@@ -839,18 +839,18 @@ class PostgresData implements SqlData {
 		} else if (_.isNumber(this._postgresValue) && Number.isInteger(this._postgresValue)) {
 			return this._postgresValue;
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asNullableInteger"));
 		}
 	}
 	public get asNumber(): number {
 		if (this._postgresValue === null) {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asNumber"));
 		} else if (_.isNumber(this._postgresValue)) {
 			return this._postgresValue;
 		} else if (this._fi.dataTypeID === PostgresObjectID.numeric && _.isString(this._postgresValue)) {
 			return Number.parseFloat(this._postgresValue);
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asNumber"));
 		}
 	}
 	public get asNullableNumber(): number | null {
@@ -861,18 +861,18 @@ class PostgresData implements SqlData {
 		} else if (this._fi.dataTypeID === PostgresObjectID.numeric && _.isString(this._postgresValue)) {
 			return Number.parseFloat(this._postgresValue);
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asNullableNumber"));
 		}
 	}
 	public get asFinancial(): Financial {
 		if (this._postgresValue === null) {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asFinancial"));
 		} else if (_.isNumber(this._postgresValue)) {
 			return this._financialOperation.fromFloat(this._postgresValue);
 		} else if (_.isString(this._postgresValue)) {
 			return this._financialOperation.parse(this._postgresValue);
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asFinancial"));
 		}
 	}
 	public get asNullableFinancial(): Financial | null {
@@ -883,17 +883,18 @@ class PostgresData implements SqlData {
 		} else if (_.isString(this._postgresValue)) {
 			return this._financialOperation.parse(this._postgresValue);
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asNullableFinancial"));
 		}
 	}
 	public get asDate(): Date {
 		if (this._postgresValue === null) {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asDate"));
 		} else if (this._fi.dataTypeID === PostgresObjectID.timestamp && this._postgresValue instanceof Date) {
 			// `pg` library make Date with local zone shift, so we need to make oposite changes to retrieve correct date from UTC timestamp
 			return new Date(this._postgresValue.getTime() - this._postgresValue.getTimezoneOffset() * 60000);
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage(
+				"asDate",
 				`Right now the library supports TIMESTAMP WITHOUT TIME ZONE OID=${PostgresObjectID.timestamp} only. Got OID=${this._fi.dataTypeID}.`
 			));
 		}
@@ -906,17 +907,18 @@ class PostgresData implements SqlData {
 			return new Date(this._postgresValue.getTime() - this._postgresValue.getTimezoneOffset() * 60000);
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage(
+				"asNullableDate",
 				`Right now the library supports TIMESTAMP WITHOUT TIME ZONE OID=${PostgresObjectID.timestamp} only. Got OID=${this._fi.dataTypeID}.`
 			));
 		}
 	}
 	public get asBinary(): Uint8Array {
 		if (this._postgresValue === null) {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asBinary"));
 		} else if (this._postgresValue instanceof Uint8Array) {
 			return this._postgresValue;
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asBinary"));
 		}
 	}
 	public get asNullableBinary(): Uint8Array | null {
@@ -925,16 +927,17 @@ class PostgresData implements SqlData {
 		} else if (this._postgresValue instanceof Uint8Array) {
 			return this._postgresValue;
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asNullableBinary"));
 		}
 	}
 	public get asObject(): any {
 		if (this._postgresValue === null) {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asObject"));
 		} else if (this._fi.dataTypeID === PostgresObjectID.jsonb) {
 			return this._postgresValue;
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage(
+				"asObject",
 				`Right now the library supports Binary JSON (OID=${PostgresObjectID.jsonb}) only.`
 			));
 		}
@@ -945,7 +948,7 @@ class PostgresData implements SqlData {
 		} else if (this._fi.dataTypeID === PostgresObjectID.jsonb) {
 			return this._postgresValue;
 		} else {
-			throw new InvalidOperationError(this.formatWrongDataTypeMessage());
+			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asNullableObject"));
 		}
 	}
 
@@ -958,8 +961,14 @@ class PostgresData implements SqlData {
 		this._financialOperation = financialOperation;
 	}
 
-	private formatWrongDataTypeMessage(subMessage?: string): string {
-		const message = `Invalid conversion: requested wrong data type of field '${this._fi.name}'.`;
+	private formatWrongDataTypeMessage(caller: keyof SqlData, subMessage?: string): string {
+		let valueConstructorName: string;
+		if (this._postgresValue !== null && this._postgresValue !== undefined) {
+			valueConstructorName = this._postgresValue.constructor.name;
+		} else {
+			valueConstructorName = `${this._postgresValue}`;
+		}
+		const message = `Invalid conversion for caller '${caller}' on a field '${this._fi.name}' with dataTypeID: '${this._fi.dataTypeID}'. PostgresValue instance of constructor '${valueConstructorName}'`;
 
 		if (subMessage !== undefined) {
 			return `${message} ${subMessage}`;
