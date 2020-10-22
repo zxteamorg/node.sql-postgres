@@ -6,14 +6,14 @@ cache:
 
 test-unit:
   stage: test
-  image: docker.registry.zxteam.net/pub/docker/build/node10.protoc-mysqlcli-psqlcli:1
+  image: node:11-alpine
   dependencies:
     - compile
   variables:
     GIT_STRATEGY: none
-    TEST_DB_URL: 'postgres://postgres:@postgres:5432/emptytestdb'
+    TEST_DB_URL: 'postgres://postgres:@postgres:5432/devdb'
   services:
-    - name: docker.registry.zxteam.net/pub/docker/test/postgres10:1
+    - name: zxteamorg/devel.postgres-10:20200914
       alias: postgres
   script:
     - npm run test
