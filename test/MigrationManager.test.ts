@@ -24,7 +24,7 @@ const { myDescribe, TEST_DB_URL } = (function (): {
 			const host = "localhost";
 			const port = 5432;
 			const user = "postgres";
-			testDbUrl = `postgres://${user}@${host}:${port}/emptytestdb`;
+			testDbUrl = `postgres://${user}@${host}:${port}/devdb`;
 			return Object.freeze({ myDescribe: describe, TEST_DB_URL: testDbUrl });
 		}
 	}

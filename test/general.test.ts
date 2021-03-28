@@ -2,7 +2,7 @@ import { CancellationToken, Financial } from "@zxteam/contract";
 import { DUMMY_CANCELLATION_TOKEN } from "@zxteam/cancellation";
 import { logger } from "@zxteam/logger";
 import { FinancialOperation, Settings as FinancialSettings, setup as financialSetup } from "@zxteam/financial";
-import { SqlProvider, SqlSyntaxError, SqlConstraintError, SqlError, MigrationSources } from "@zxteam/sql";
+import { SqlProvider, SqlSyntaxError, SqlConstraintError, SqlError, MigrationSources, SqlResultRecord } from "@zxteam/sql";
 
 import * as chai from "chai";
 import { PendingSuiteFunction, Suite, SuiteFunction } from "mocha";
@@ -54,8 +54,8 @@ const { myDescribe, TEST_DB_URL } = (function (): {
 		case "postgres://": {
 			const host = "localhost";
 			const port = 5432;
-			const user = "postgres";
-			testDbUrl = `postgres://${user}@${host}:${port}/emptytestdb`;
+			const user = "devadmin";
+			testDbUrl = `postgres://${user}@${host}:${port}/devdb`;
 			return Object.freeze({ myDescribe: describe, TEST_DB_URL: testDbUrl });
 		}
 	}
@@ -523,10 +523,40 @@ myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () 
 		assert.equal(resultArray.length, 3);
 	});
 
-	it("Should be able read TIMESTAMP WITHOUT TIME ZONE", async function () {
+	it("Should be able to read TIMESTAMP WITHOUT TIME ZONE", async function () {
 		const result = await getSqlProvider()
 			.statement("SELECT ts FROM tb_dates_test WHERE id = 1")
 			.executeSingle(DUMMY_CANCELLATION_TOKEN);
+		const ts: Date = result.get("ts").asDate;
+		assert.equal(ts.getTime(), 1466622000410); // 1466622000410 --> "2016-06-22T19:00:00.410Z"
+		assert.equal(ts.toISOString(), "2016-06-22T19:00:00.410Z");
+	});
+	it("Should be able search between (by AND) TIMESTAMP WITHOUT TIME ZONE", async function () {
+		const searchLeftDate: Date = new Date("2016-06-22T19:00:00.409Z");
+		const searchRightDate: Date = new Date("2016-06-22T19:00:00.411Z");
+		const result = await getSqlProvider()
+			.statement("SELECT ts FROM tb_dates_test WHERE ts > to_timestamp($1::DOUBLE PRECISION / 1000)::TIMESTAMP WITHOUT TIME ZONE AND ts < to_timestamp($2::DOUBLE PRECISION / 1000)::TIMESTAMP WITHOUT TIME ZONE")
+			.executeSingle(DUMMY_CANCELLATION_TOKEN, searchLeftDate.getTime(), searchRightDate.getTime());
+		const ts: Date = result.get("ts").asDate;
+		assert.equal(ts.getTime(), 1466622000410); // 1466622000410 --> "2016-06-22T19:00:00.410Z"
+		assert.equal(ts.toISOString(), "2016-06-22T19:00:00.410Z");
+	});
+	it("Should be able search between (by AND) via spread operator TIMESTAMP WITHOUT TIME ZONE", async function () {
+		const searchLeftDate: Date = new Date("2016-06-22T19:00:00.409Z");
+		const searchRightDate: Date = new Date("2016-06-22T19:00:00.411Z");
+		const result = await getSqlProvider()
+			.statement("SELECT ts FROM tb_dates_test WHERE ts > to_timestamp($1::DOUBLE PRECISION / 1000)::TIMESTAMP WITHOUT TIME ZONE AND ts < to_timestamp($2::DOUBLE PRECISION / 1000)::TIMESTAMP WITHOUT TIME ZONE")
+			.executeSingle(DUMMY_CANCELLATION_TOKEN, ...[searchLeftDate.getTime(), searchRightDate.getTime()]);
+		const ts: Date = result.get("ts").asDate;
+		assert.equal(ts.getTime(), 1466622000410); // 1466622000410 --> "2016-06-22T19:00:00.410Z"
+		assert.equal(ts.toISOString(), "2016-06-22T19:00:00.410Z");
+	});
+	it("Should be able search between (by BETWEEN) TIMESTAMP WITHOUT TIME ZONE", async function () {
+		const searchLeftDate: Date = new Date("2016-06-22T19:00:00.409Z");
+		const searchRightDate: Date = new Date("2016-06-22T19:00:00.411Z");
+		const result = await getSqlProvider()
+			.statement("SELECT ts FROM tb_dates_test WHERE ts BETWEEN to_timestamp($1::DOUBLE PRECISION / 1000)::TIMESTAMP WITHOUT TIME ZONE AND to_timestamp($2::DOUBLE PRECISION / 1000)::TIMESTAMP WITHOUT TIME ZONE")
+			.executeSingle(DUMMY_CANCELLATION_TOKEN, searchLeftDate.getTime(), searchRightDate.getTime());
 		const ts: Date = result.get("ts").asDate;
 		assert.equal(ts.getTime(), 1466622000410); // 1466622000410 --> "2016-06-22T19:00:00.410Z"
 		assert.equal(ts.toISOString(), "2016-06-22T19:00:00.410Z");
@@ -549,8 +579,8 @@ myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () 
 		const testDate = new Date();
 
 		const insertId = await getSqlProvider()
-			.statement("INSERT INTO tb_dates_test(ts) VALUES($1) RETURNING id")
-			.executeScalar(DUMMY_CANCELLATION_TOKEN, testDate);
+			.statement("INSERT INTO tb_dates_test(ts) VALUES(to_timestamp($1::DOUBLE PRECISION / 1000)::TIMESTAMP WITHOUT TIME ZONE) RETURNING id")
+			.executeScalar(DUMMY_CANCELLATION_TOKEN, testDate.getTime());
 
 		const result = await getSqlProvider()
 			.statement("SELECT ts FROM tb_dates_test WHERE id = $1")
@@ -559,7 +589,46 @@ myDescribe(`PostgreSQL Tests (schema:general_test_1_${timestamp})`, function () 
 		const ts: Date = result.get("ts").asDate;
 		assert.equal(ts.toISOString(), testDate.toISOString());
 	});
-
+	it("Should be able to read 2021-03-28T01:02:25.898542Z", async function () {
+		const result = await getSqlProvider()
+			.statement("SELECT acivated_at FROM tb_dates_test2 WHERE id = 1")
+			.executeSingle(DUMMY_CANCELLATION_TOKEN);
+		const ts: Date = result.get("acivated_at").asDate;
+		assert.equal(ts.getTime(), 1616893345898); // 1616893345898 --> "2021-03-28T01:02:25.898Z"
+		assert.equal(ts.toISOString(), "2021-03-28T01:02:25.898Z");
+	});
+	it("Should pass date 2016-06-22T19:00:00.409Z in UTC #1", async function () {
+		const searchDate1: Date = new Date("2016-06-22T19:00:00.409Z");
+		const row: SqlResultRecord = await getSqlProvider()
+			.statement("SELECT to_timestamp($1::DOUBLE PRECISION / 1000)::TEXT AS acivated_at_text")
+			.executeSingle(DUMMY_CANCELLATION_TOKEN, searchDate1.getTime());
+		const acivated_at_text: string = row.get("acivated_at_text").asString;
+		assert.equal(acivated_at_text, "2016-06-22 19:00:00.409+00");
+	});
+	it("Should pass date 2016-06-22T19:00:00.409Z in UTC #2", async function () {
+		const searchDate1: Date = new Date("2016-06-22T19:00:00.409Z");
+		const row: SqlResultRecord = await getSqlProvider()
+			.statement("SELECT to_timestamp($1::DOUBLE PRECISION / 1000)::TIMESTAMP WITHOUT TIME ZONE::TEXT AS acivated_at_text")
+			.executeSingle(DUMMY_CANCELLATION_TOKEN, searchDate1.getTime());
+		const acivated_at_text: string = row.get("acivated_at_text").asString;
+		assert.equal(acivated_at_text, "2016-06-22 19:00:00.409");
+	});
+	it("Should pass date 2021-03-28T01:02:25.898542Z in UTC #1", async function () {
+		const searchDate1: Date = new Date("2021-03-28T01:02:25.898Z");
+		const row: SqlResultRecord = await getSqlProvider()
+			.statement("SELECT to_timestamp($1::DOUBLE PRECISION / 1000)::TEXT AS acivated_at_text")
+			.executeSingle(DUMMY_CANCELLATION_TOKEN, searchDate1.getTime());
+		const acivated_at_text: string = row.get("acivated_at_text").asString;
+		assert.equal(acivated_at_text, "2021-03-28 01:02:25.898+00");
+	});
+	it("Should pass date 2021-03-28T01:02:25.898542Z in UTC #2", async function () {
+		const searchDate1: Date = new Date("2021-03-28T01:02:25.898Z");
+		const row: SqlResultRecord = await getSqlProvider()
+			.statement("SELECT to_timestamp($1::DOUBLE PRECISION / 1000)::TIMESTAMP WITHOUT TIME ZONE::TEXT AS acivated_at_text")
+			.executeSingle(DUMMY_CANCELLATION_TOKEN, searchDate1.getTime());
+		const acivated_at_text: string = row.get("acivated_at_text").asString;
+		assert.equal(acivated_at_text, "2021-03-28 01:02:25.898");
+	});
 	it("execute should raise SqlSyntaxError for bad sql command", async function () {
 		let expectedError!: SqlSyntaxError;
 		try {

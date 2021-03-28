@@ -29,8 +29,8 @@ function getOpts(): PostgresProviderFactory.Opts {
 			case "postgres://": {
 				const host = "localhost";
 				const port = 5432;
-				const user = "devtest";
-				const postgresUrl = new URL(`postgres://${user}@${host}:${port}/emptytestdb`);
+				const user = "devuser";
+				const postgresUrl = new URL(`postgres://${user}@${host}:${port}/devdb`);
 				return { url: postgresUrl, log: logger };
 			}
 		}

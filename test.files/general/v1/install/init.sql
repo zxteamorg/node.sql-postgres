@@ -41,6 +41,15 @@ CREATE TABLE "tb_dates_test" (
 );
 INSERT INTO "tb_dates_test"("ts","tstz") VALUES ('2016-06-22 19:00:00.410', '2016-06-22 19:00:00.410');
 
+-- DROP TABLE IF EXISTS "tb_dates_test2";
+SET TIMEZONE = 'UTC'; 
+CREATE TABLE "tb_dates_test2" (
+	"id"          SERIAL,
+	"acivated_at" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'utc'),
+	PRIMARY KEY ("id")
+);
+INSERT INTO "tb_dates_test2"("acivated_at") VALUES ('"2021-03-28 01:02:25.898542"'); -- Time switch Standard to Summer time
+
 -- DROP TABLE IF EXISTS "tb_jsonb_test";
 CREATE TABLE "tb_jsonb_test" (
 	"id"         SERIAL,

@@ -40,3 +40,19 @@ postgres+ssl://my_pg_host:5432/postgres
 ```
 
 Note: For full SSL mode you need to pass `opts.ssl` programically. Passing certificates via URL does not supported.
+
+## Development Notes
+
+### Postgres inside Docker
+
+#### Start
+
+```bash
+docker kill postgres10devdb; docker rm postgres10devdb; docker run --name postgres10devdb --rm --publish 5432:5432 --detach zxteamorg/devel.postgres-10:20200914
+```
+
+#### Start + run tests
+
+```bash
+docker kill postgres10devdb; docker rm postgres10devdb; docker run --name postgres10devdb --rm --publish 5432:5432 --detach zxteamorg/devel.postgres-10:20200914; sleep 5; npm run build && npm run test:local
+```

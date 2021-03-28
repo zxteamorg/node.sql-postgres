@@ -191,6 +191,11 @@ const enum PostgresObjectID {
 	_regrole = 4097
 }
 
+pg.types.setTypeParser(PostgresObjectID.timestamp as any, function (stringValue) {
+	return stringValue;
+});
+
+
 export class PostgresProviderFactory extends Initable implements SqlProviderFactory {
 	private readonly _financialOperation: FinancialOperation;
 	private readonly _log: Logger;
@@ -889,9 +894,12 @@ class PostgresData implements SqlData {
 	public get asDate(): Date {
 		if (this._postgresValue === null) {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage("asDate"));
-		} else if (this._fi.dataTypeID === PostgresObjectID.timestamp && this._postgresValue instanceof Date) {
+			// } else if (this._fi.dataTypeID === PostgresObjectID.timestamp && this._postgresValue instanceof Date) {
+			// 	// `pg` library make Date with local zone shift, so we need to make oposite changes to retrieve correct date from UTC timestamp
+			// 	return new Date(this._postgresValue.getTime() - this._postgresValue.getTimezoneOffset() * 60000);
+		} else if (this._fi.dataTypeID === PostgresObjectID.timestamp && typeof this._postgresValue === "string") {
 			// `pg` library make Date with local zone shift, so we need to make oposite changes to retrieve correct date from UTC timestamp
-			return new Date(this._postgresValue.getTime() - this._postgresValue.getTimezoneOffset() * 60000);
+			return new Date(`${this._postgresValue}+0000`);
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage(
 				"asDate",
@@ -902,9 +910,12 @@ class PostgresData implements SqlData {
 	public get asNullableDate(): Date | null {
 		if (this._postgresValue === null) {
 			return null;
-		} else if (this._fi.dataTypeID === PostgresObjectID.timestamp && this._postgresValue instanceof Date) {
+		// } else if (this._fi.dataTypeID === PostgresObjectID.timestamp && this._postgresValue instanceof Date) {
+		// 	// `pg` library make Date with local zone shift, so we need to make oposite changes to retrieve correct date from UTC timestamp
+		// 	return new Date(this._postgresValue.getTime() - this._postgresValue.getTimezoneOffset() * 60000);
+		} else if (this._fi.dataTypeID === PostgresObjectID.timestamp && typeof this._postgresValue === "string") {
 			// `pg` library make Date with local zone shift, so we need to make oposite changes to retrieve correct date from UTC timestamp
-			return new Date(this._postgresValue.getTime() - this._postgresValue.getTimezoneOffset() * 60000);
+			return new Date(`${this._postgresValue}+0000`);
 		} else {
 			throw new InvalidOperationError(this.formatWrongDataTypeMessage(
 				"asNullableDate",
@@ -1076,8 +1087,10 @@ namespace helpers {
 					if (financialOperation.isFinancial(value)) {
 						return value.toString(); // Financial should be converted to string
 					} else if (value instanceof Date) {
-						// `pg` library make Date with local zone shift, so we need to make oposite changes to save correct date as UTC timestamp
-						return new Date(value.getTime() + value.getTimezoneOffset() * 60000);
+						throw new InvalidOperationError("You trying to pass date object as statement parameter. Right now this is not supported (long story)... As workaround you have to pass date object as unix milliseconds by calling .getTime() and use 'to_timestamp($1::DOUBLE PRECISION / 1000)::TIMESTAMP WITHOUT TIME ZONE' to decode unix milliseconds to Postgres timestamp.");
+						// // `pg` library make Date with local zone shift, so we need to make oposite changes to save correct date as UTC timestamp
+						// THIS IS WORK INCORRECT FOR DATE (in time switch period): 2021-03-28T01:24:59.741Z
+						// return new Date(value.getTime() + value.getTimezoneOffset() * 60000);
 					}
 				}
 			}
