@@ -1,4 +1,4 @@
-DEPRECATED
+# DEPRECATED
 Moved to https://github.com/freemework/sql.postgres/tree/src-typescript
 
 # ZXTeam's PostgreSQL Facade
