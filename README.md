@@ -1,3 +1,6 @@
+DEPRECATED
+Moved to https://github.com/freemework/sql.postgres/tree/src-typescript
+
 # ZXTeam's PostgreSQL Facade
 [![npm version badge](https://img.shields.io/npm/v/@zxteam/sql-postgres.svg)](https://www.npmjs.com/package/@zxteam/sql-postgres)
 [![downloads badge](https://img.shields.io/npm/dm/@zxteam/sql-postgres.svg)](https://www.npmjs.com/package/@zxteam/sql-postgres)
